@@ -94,7 +94,7 @@
        앱 3 관리자 페이지
        - 학생 앱 주소 끝에 ?page=admin 을 붙여 엽니다.
        - 어구는 구글 시트 '앱3 어구' 탭에 저장되고, 학생 앱이 거기서 불러옵니다.
-       - 쓰임: 창고(모아 두기만) · 수업(1~3단계에 나오는 어구) · 가르치기(4단계 '컴퓨터 가르치기' 문제, 낱말마다 2개 — 시트에는 '점검'으로 저장)
+       - 쓰임: 창고(모아 두기만) · 수업(1~3단계에 나오는 어구) · 점검(4단계 '새 어구 점검' 어구, 낱말마다 2개)
        ※ 아래 뜻 이름과 세는 규칙은 학생 앱(index.html)과 같아야 합니다.
        ===================================================================== */
     const WINDOW = 2;
@@ -110,20 +110,21 @@
     const MEANING_COLORS = ["#4f46e5", "#f59e0b", "#16a34a"];
     const GROUP_COLORS = ["#7c3aed", "#0d9488", "#db2777", "#ea580c", "#0891b2", "#65a30d", "#be123c", "#4338ca"];
     const SHORT = ["①", "②", "③"];
+    const MAX_LESSON = 12;   // 2단계에서 줄을 손으로 옮기기 좋은 최대 어구 수
     const MAX_CHECK = 2, BASE_WEIGHT = 2, TEACH_MAX = 3;
     const USES = ["창고", "수업", "점검"];
-    const USE_LABEL = { "창고": "창고", "수업": "수업", "점검": "가르치기" };
+    const USE_LABEL = { "창고": "창고", "수업": "수업", "점검": "점검" };
 
     // 시트가 비어 있을 때 넣어 두는 선생님 예시 어구 (지금 학생 앱에 들어 있는 어구와 같음)
     const EXAMPLES = {
       "반려": { lesson: [["우리 집 반려 강아지 산책", 1], ["학교 신청서 반려 이유", 2], ["반려 강아지 사료 고르기", 1], ["보고서 반려 이유 설명", 2], ["반려 고양이 사료 걱정", 1], ["결재 서류 반려 통보", 2], ["새 반려 고양이 입양", 1], ["보고서 반려 통보 받음", 2]],
-        checks: [["강아지 사료 서류 반려", 2, "사료=4/0; 서류=0/2"], ["고양이 신청서 반려", 2, "고양이=4/0; 신청서=0/2"]] },
+        checks: [["강아지 사료 서류 반려", 2, ""], ["반려 거북이 수조 청소", 1, ""]] },
       "무료": { lesson: [["주말 박물관 무료 입장", 1], ["할 일 없는 무료한 오후", 2], ["놀이공원 무료 입장 행사", 1], ["비 오는 날 무료한 오후", 2], ["음료 무료 쿠폰 행사", 1], ["방학 내내 무료한 오후", 2], ["배송비 무료 쿠폰", 1], ["심심하고 무료한 오후", 2]],
-        checks: [["행사 없는 무료한 하루", 2, "행사=4/0; 없는=0/2"], ["박물관 휴관 무료한 하루", 2, "박물관=2/0"]] },
+        checks: [["행사 없는 무료한 하루", 2, ""], ["무료한 오후 산책", 2, ""]] },
       "의사": { lesson: [["동네 병원 의사 진료", 1], ["안중근 의사 기념관", 2], ["반대 의사 표현", 3], ["치과 의사 진료", 1], ["윤봉길 의사 기념관 견학", 2], ["찬성 의사 표현", 3], ["소아과 의사 진료 시간", 1], ["독립운동가 안중근 의사 이야기", 2], ["참가 의사 표현 하기", 3]],
-        checks: [["기념관 반대 의사", 3, "기념관=0/4/0; 반대=0/0/2"], ["견학 거절 의사", 3, "견학=0/2/0"]] },
+        checks: [["기념관 반대 의사", 3, ""], ["한의원 의사 선생님", 1, ""]] },
       "연패": { lesson: [["축구부 연패 탈출 작전", 1], ["대회 3 연패 우승", 2], ["야구부 연패 탈출 성공", 1], ["올림픽 2 연패 금메달", 2], ["긴 연패 늪 탈출", 1], ["줄넘기 대회 2 연패 달성", 2], ["농구부 긴 연패 늪", 1], ["세계 대회 연패 금메달", 2]],
-        checks: [["올림픽 연패 충격", 1, "올림픽=0/2"], ["농구부 연패 축하", 2, "농구부=2/0"]] }
+        checks: [["올림픽 연패 충격", 1, ""], ["대회 연패 탈출", 1, ""]] }
     };
     function exampleRows() {
       const rows = [];
@@ -171,24 +172,24 @@
       return table;
     }
     function groupsOf(list, t) {
-      const C = list.map(r => clueWords(contextOf(r.text, t).ctx)), table = clueScoreTable(list, t);
-      const groups = MEANINGS[t].map(() => []);
-      C.forEach((ctx, i) => {
-        const scores = MEANINGS[t].map((_, mi) => ctx.reduce((sum, w) => sum + (table[w] ? table[w][mi] : 0), 0));
-        const max = Math.max(...scores), tops = scores.map((score, mi) => score === max ? mi : -1).filter(mi => mi >= 0);
-        const labeled = list[i].code - 1, winner = tops.includes(labeled) ? labeled : tops[0];
-        if (winner >= 0) groups[winner].push(i);
-      });
-      return { C, groups, table };
+      const C = list.map(r => contextOf(r.text, t).ctx), n = C.length, p = C.map((_, i) => i);
+      const f = x => p[x] === x ? x : (p[x] = f(p[x]));
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (shareWords(C[i], C[j]).length) p[f(i)] = f(j);
+      const map = {}, groups = [];
+      for (let i = 0; i < n; i++) { const r = f(i); if (map[r] == null) { map[r] = groups.length; groups.push([]); } groups[map[r]].push(i); }
+      return { C, groups };
     }
     function judge(list, t, text) {
-      const { table } = groupsOf(list, t), ctx = clueWords(contextOf(text, t).ctx);
-      const hits = MEANINGS[t].map((_, mi) => [...new Set(ctx.filter(w => table[w] && table[w][mi] > 0))]);
-      const scores = MEANINGS[t].map((_, mi) => ctx.reduce((sum, w) => sum + (table[w] ? table[w][mi] : 0), 0));
-      const max = Math.max(0, ...scores), tops = scores.map((score, i) => score === max ? i : -1).filter(i => i >= 0);
-      if (!list.length || max === 0) return { kind: "unknown", ctx };
+      const { C, groups } = groupsOf(list, t), ctx = contextOf(text, t).ctx;
+      const hits = groups.map(g => [...new Set(ctx.filter(x => g.some(i => C[i].includes(x))))]);
+      const scores = groups.map(g => ctx.reduce((a, x) => a + g.reduce((b, i) => b + C[i].filter(y => y === x).length, 0), 0));
+      const max = Math.max(0, ...scores), tops = scores.map((s, i) => s === max ? i : -1).filter(i => i >= 0);
+      if (!groups.length || max === 0) return { kind: "unknown", ctx };
       if (tops.length > 1) return { kind: "tie", ctx, words: [...new Set(tops.flatMap(i => hits[i]))] };
-      return { kind: "pick", ctx, words: hits[tops[0]], code: tops[0] + 1, mixed: false };
+      const g = groups[tops[0]], cnt = {};
+      g.forEach(i => { cnt[list[i].code] = (cnt[list[i].code] || 0) + 1; });
+      const code = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+      return { kind: "pick", ctx, words: hits[tops[0]], code, mixed: Object.keys(cnt).length > 1 };
     }
 
     /* ===== 점검 표시 ===== */
@@ -222,9 +223,8 @@
     function setUse(id, use) {
       const r = rows.find(x => x.id === id); if (!r) return;
       if (use !== "창고" && !usable(r)) { notice("⚠️ 빨간 표시를 먼저 고쳐 주세요."); return; }
-      if (use === "점검" && r.use !== "점검" && checkRows(r.word).length >= MAX_CHECK) { notice(`⚠️ 가르치기 문제는 ${MAX_CHECK}개까지예요. 하나를 먼저 창고로 빼 주세요.`); return; }
+      if (use === "점검" && r.use !== "점검" && checkRows(r.word).length >= MAX_CHECK) { notice(`⚠️ 점검 어구는 ${MAX_CHECK}개까지예요. 하나를 먼저 창고로 빼 주세요.`); return; }
       r.use = use;
-      if (use === "점검" && !r.learned) r.learned = defaultLearned(r);
       markDirty(); render();
     }
     function editText(id, v) {
@@ -359,7 +359,7 @@
     }
     function saveAll() {
       busy = true; saveMsg = "저장하는 중…"; render();
-      const out = rows.map(r => ({ cls: r.cls, group: r.group, word: r.word, code: r.code, text: r.text, orig: r.orig, use: r.use, learned: r.use === "점검" ? r.learned : "" }));
+      const out = rows.map(r => ({ cls: r.cls, group: r.group, word: r.word, code: r.code, text: r.text, orig: r.orig, use: r.use, learned: "" }));
       call("adminSaveRows", [pw, out], n => { busy = false; dirty = false; saveMsg = `✅ 저장했어요 (어구 ${n}개). 학생 앱을 새로 열면 반영돼요.`; render(); });
     }
 
@@ -374,21 +374,46 @@
     }
     function analyze(t) {
       const list = lessonRows(t), { C, groups } = groupsOf(list, t), nM = MEANINGS[t].length;
-      const info = groups.map(g => ({ g, codes: [...new Set(g.map(i => list[i].code))], bridges: [] }));
+      const info = groups.map(g => {
+        const codes = [...new Set(g.map(i => list[i].code))];
+        const bridges = [];
+        if (codes.length > 1) {
+          for (let a = 0; a < g.length; a++) for (let b = a + 1; b < g.length; b++) {
+            const i = g[a], j = g[b];
+            if (list[i].code === list[j].code) continue;
+            const w = shareWords(C[i], C[j]);
+            if (w.length) bridges.push({ w, a: list[i], b: list[j] });
+          }
+        }
+        return { g, codes, bridges };
+      });
       const problems = [];
       const usedCodes = new Set(list.map(r => r.code));
       for (let k = 1; k <= nM; k++) if (!usedCodes.has(k)) problems.push(`${SHORT[k - 1]} '${MEANINGS[t][k - 1]}' 뜻의 수업 어구가 없어요.`);
-      if (!checkRows(t).length) problems.push("4단계 '컴퓨터 가르치기' 문제가 없어요. 컴퓨터가 틀리는 어구 1~2개를 '가르치기'로 골라 주세요.");
-      const ready = !problems.length && groups.every(g => g.length > 0);
+      if (list.length < 4) problems.push("수업 어구가 너무 적어요. 뜻마다 3~4개가 좋아요.");
+      if (list.length > MAX_LESSON) problems.push(`수업 어구가 ${list.length}개예요. 2단계에서 줄을 손으로 옮기려면 ${MAX_LESSON}개 이하가 좋아요.`);
+      if (info.some(x => x.codes.length > 1)) problems.push("여러 뜻이 섞인 덩어리가 있어요. 빨간 '다리 말'이 든 어구를 창고로 빼 보세요.");
+      if (groups.length > nM) problems.push(`덩어리가 ${groups.length}개로 쪼개졌어요(뜻은 ${nM}개). 같은 뜻 어구끼리 옆 말이 하나 이상 겹쳐야 이어져요.`);
+      if (!checkRows(t).length) problems.push("4단계 점검 어구가 없어요. 컴퓨터가 '짐작 · 헷갈려요 · 모르겠어요' 하는 어구 1~2개를 '점검'으로 골라 주세요.");
+      const ready = !problems.length && groups.length === nM;
       return { list, C, groups, info, problems, ready };
     }
     // 창고 어구를 수업에 넣었을 때 뜻별 단서 점수로 어디에 분류될까?
     function effectOf(r, A) {
       if (!usable(r)) return "";
-      const j = judge(A.list, r.word, r.text);
-      if (j.kind === "unknown") return `<span class="effect" style="color:#64748b">➖ 단서가 없어 판단할 수 없어요</span>`;
-      if (j.kind === "tie") return `<span class="effect" style="color:#d97706">🤖 헷갈려요 (${j.words.map(esc).join(", ")})</span>`;
-      return `<span class="effect" style="color:${j.code === r.code ? "#16a34a" : "#dc2626"}">🤖 ${SHORT[j.code - 1]}일 것 같아요 ${j.code === r.code ? "⭕" : "❌"} (${j.words.map(esc).join(", ")})</span>`;
+      const t = r.word, ctx = contextOf(r.text, t).ctx;
+      const touched = A.groups.map((g, gi) => ({ gi, w: [...new Set(ctx.filter(x => g.some(i => A.C[i].includes(x))))] })).filter(x => x.w.length);
+      if (!touched.length) return `<span class="effect" style="color:#64748b">➖ 혼자 떨어져요</span>`;
+      const codes = new Set(touched.flatMap(x => A.groups[x.gi].map(i => A.list[i].code)));
+      if (touched.length > 1 || [...codes].some(c => c !== r.code)) return `<span class="effect" style="color:#dc2626">⚠️ 다른 뜻과 이어져요 (${touched.flatMap(x => x.w).map(esc).join(", ")})</span>`;
+      return `<span class="effect" style="color:#16a34a">🔗 같은 뜻과 이어져요 (${touched[0].w.map(esc).join(", ")})</span>`;
+    }
+    // 4단계 점검 어구에서 학생이 보게 될 장면 (학생 앱과 같은 판단)
+    function sceneLabel(t, A, r) {
+      const j = judge(A.list, t, r.text);
+      if (j.kind === "unknown") return `<span class="effect" style="color:#64748b">🤖 장면: 모르겠어요 (처음 보는 옆 말)</span>`;
+      if (j.kind === "tie") return `<span class="effect" style="color:#d97706">🤖 장면: 헷갈려요 (${j.words.map(esc).join(", ")})</span>`;
+      return `<span class="effect" style="color:${j.code === r.code ? "#16a34a" : "#dc2626"}">🤖 장면: ${SHORT[j.code - 1]}일 것 같아요 ${j.code === r.code ? "⭕ 맞힘" : "❌ 틀림"} (${j.words.map(esc).join(", ")})</span>`;
     }
     function judgeLabel(t, A, text, code) {
       const j = judge(A.list, t, text);
@@ -409,7 +434,7 @@
         <p class="note">처음 들어올 때 적은 비밀번호가 이 페이지의 비밀번호가 돼요. (4자 이상)</p>
       </div>`;
     }
-    /* ----- 4단계 가르치기 문제: 가상의 컴퓨터가 학습한 결과 -----
+    /* ----- (예전 4단계 '컴퓨터 가르치기'용 함수, 지금은 쓰지 않음) -----
        learned = "옆 말=①횟수/②횟수(/③횟수); …"  (1~3단계 수업 어구와 따로 움직임) */
     function parseLearned(t, str) {
       const nM = MEANINGS[t].length, out = {};
@@ -479,7 +504,7 @@
         <details class="card help"><summary>❓ 처음이라면 — 이렇게 써요</summary>
           <ol>
             <li><b>가져오기:</b> CSV 파일을 선택하거나 엑셀·구글 시트에서 <b>반·모둠·단어·뜻코드·어구</b> 칸을 머리글째 복사해 붙여넣어요. 새 어구는 모두 <b>창고</b>에 들어가며, 저장 전 중복과 읽지 못한 줄을 확인할 수 있어요.</li>
-            <li><b>고르기:</b> 낱말 탭에서 어구마다 <b>수업</b>(1~3단계에 나옴) 또는 <b>가르치기</b>(4단계 '컴퓨터 가르치기' 문제, 2개까지)를 눌러요. 가르치기 문제는 <b>컴퓨터가 뜻을 틀리게 고르는 어구</b>가 좋아요. 오른쪽에서 컴퓨터가 어떻게 나누는지 바로 보여요.</li>
+            <li><b>고르기:</b> 낱말 탭에서 어구마다 <b>수업</b>(1~3단계에 나옴, 8~12개) 또는 <b>점검</b>(4단계 새 어구 점검, 2개까지)을 눌러요. 오른쪽에서 컴퓨터가 어떻게 나누는지 바로 보여요.</li>
             <li><b>맞추기:</b> 오른쪽이 <b>✅</b>가 될 때까지 어구를 넣고 빼요. 창고 어구 옆의 <b>🔗 / ⚠️ / ➖</b>는 그 어구를 수업에 넣으면 어떻게 되는지 알려 줘요.</li>
             <li><b>저장:</b> 아래 <b>[💾 저장]</b>을 눌러야 학생 앱에 반영돼요. ✅가 아닌 낱말은 학생 앱이 원래 예시 어구를 써요.</li>
           </ol>
@@ -520,7 +545,7 @@
                     ${r.orig ? `<div class="orig">원래: ${esc(r.orig)}</div>` : ""}
                     ${fl.map(f => `<div class="flag ${f.lv}">${f.lv === "bad" ? "⛔" : f.lv === "warn" ? "⚠️" : "ℹ️"} ${esc(f.msg)} ${f.fix ? `<button class="btn small" onclick="stripParticles(${r.id})">조사 떼기</button>` : ""}</div>`).join("")}</td>
                   <td class="note">${esc(r.cls)}${r.group ? `·${esc(r.group)}` : ""}</td>
-                  <td>${r.use === "창고" ? effectOf(r, A) + "<br>" + (usable(r) ? judgeLabel(t, A, r.text, r.code) : "") : r.use === "점검" && usable(r) ? learnedSummary(r) : ""}</td>
+                  <td>${r.use === "창고" ? effectOf(r, A) + "<br>" + (usable(r) ? judgeLabel(t, A, r.text, r.code) : "") : r.use === "점검" && usable(r) ? sceneLabel(t, A, r) : ""}</td>
                   <td>${pendingDel === r.id ? `<button class="btn small" style="color:#dc2626;border-color:#fca5a5" onclick="delRow(${r.id})">지우기</button>` : `<button class="del" title="지우기" onclick="delRow(${r.id})">🗑️</button>`}</td>
                 </tr>`;
               }).join("") || `<tr><td colspan="6" class="note">어구가 없어요.</td></tr>`}</tbody>
@@ -531,20 +556,20 @@
             <div class="card">
               <h2>🤖 컴퓨터는 수업 어구 ${A.list.length}개를 이렇게 나눠요</h2>
               ${A.ready
-                ? `<div class="status ok">✅ 뜻별 단서 점수로 ${A.groups.length}개 덩어리로 분류해요. 어구 ${A.list.length}개를 모두 계산에 써요.</div>`
+                ? `<div class="status ok">✅ 덩어리 ${A.groups.length}개, 뜻마다 하나씩 나뉘어요. 수업에 쓸 수 있어요.</div>`
                 : `<div class="status warn">⚠️ 아직 학생 앱에 쓰기 어려워요. (저장해도 이 낱말은 원래 예시 어구가 나와요)<ul>${A.problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`}
               ${A.info.map((x, gi) => `
                 <div class="group" style="border-color:${GROUP_COLORS[gi % GROUP_COLORS.length]}">
-                  <h4><span class="pill" style="background:${GROUP_COLORS[gi % GROUP_COLORS.length]}">덩어리 ${gi + 1}</span> 어구 ${x.g.length}개 ${x.codes.length > 1 ? `<span class="flag warn">이름표 ${x.codes.map(c => SHORT[c - 1]).join("·")} 어구가 함께 분류됨</span>` : codePill(t, x.codes[0])}</h4>
+                  <h4><span class="pill" style="background:${GROUP_COLORS[gi % GROUP_COLORS.length]}">덩어리 ${gi + 1}</span> 어구 ${x.g.length}개 ${x.codes.length > 1 ? `<span class="flag bad">⛔ 뜻 ${x.codes.length}개가 섞였어요</span>` : codePill(t, x.codes[0])}</h4>
                   <ul>${x.g.map(i => `<li>${phraseHTML(t, A.list[i].text)} ${x.codes.length > 1 ? codePill(t, A.list[i].code) : ""}</li>`).join("")}</ul>
                   ${x.bridges.slice(0, 4).map(b => `<div class="bridge">🌉 다리 말 <b>${b.w.map(esc).join(", ")}</b>: “${esc(b.a.text)}” ${SHORT[b.a.code - 1]} ↔ “${esc(b.b.text)}” ${SHORT[b.b.code - 1]}</div>`).join("")}
                 </div>`).join("") || `<p class="note">수업 어구를 고르면 여기에 덩어리가 나와요.</p>`}
             </div>
             <div class="card">
-              <h2>🧑‍🏫 4단계 컴퓨터 가르치기 (문제 ${cks.length}/${MAX_CHECK})</h2>
-              ${cks.length ? cks.map(r => `<div class="judge"><div style="font-size:16px">🆕 ${phraseHTML(t, r.text)} ${codePill(t, r.code)}</div>${usable(r) ? teachNote(t, A, r) : `<span class="flag bad">⛔ 이 어구는 고쳐야 해요</span>`}</div>`).join("")
-                : `<p class="note">컴퓨터가 <b>뜻을 틀리게 고르는</b> 어구를 1~2개 '가르치기'로 골라 주세요. 표의 '컴퓨터 판단'에서 ❌인 어구가 좋아요.</p>`}
-              <p class="note" style="margin-top:8px">4단계는 1~3단계와 따로 움직여요. 학생 화면은 위 숫자(가상의 컴퓨터가 학습한 결과)에서 시작하고, 학생이 넣은 문장은 1번으로 더해져요. 틀린 뜻 쪽이 2~4 정도 높으면 3번 안에 바꿀 수 있어요.</p>
+              <h2>🧑‍🏫 4단계 새 어구 점검 (어구 ${cks.length}/${MAX_CHECK})</h2>
+              ${cks.length ? cks.map(r => `<div class="judge"><div style="font-size:16px">🆕 ${phraseHTML(t, r.text)} ${codePill(t, r.code)}</div>${usable(r) ? sceneLabel(t, A, r) : `<span class="flag bad">⛔ 이 어구는 고쳐야 해요</span>`}</div>`).join("")
+                : `<p class="note">학생이 먼저 뜻을 고른 뒤 컴퓨터의 판단을 볼 어구를 1~2개 '점검'으로 골라 주세요.</p>`}
+              <p class="note" style="margin-top:8px">학생은 ① 먼저 뜻을 고르고 ② [컴퓨터는?]으로 컴퓨터의 판단을 본 뒤 ③ 그대로 둘지 고칠지 정하고 근거를 써요. 컴퓨터는 위 수업 어구로 나눈 덩어리를 보고 판단해요. 서로 다른 장면(짐작 · 헷갈려요 · 모르겠어요)이 나오게 고르면 좋아요. 컴퓨터가 틀리거나 못 고르는 어구는 6차시 '원인 찾기' 자료가 돼요.</p>
             </div>
           </div>
         </div>
