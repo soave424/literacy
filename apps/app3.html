@@ -1204,7 +1204,10 @@
           { text: "농구부 긴 연패 늪", m: "A" },
           { text: "세계 대회 연패 금메달", m: "B" }
         ],
-        checks: [{ text: "올림픽 연패 충격", m: "A", learned: "올림픽=0/2" }, { text: "농구부 연패 축하", m: "B", learned: "농구부=2/0" }]
+        checks: [
+          { text: "올림픽 연패 충격", m: "A", examples: ["올림픽 연패 탈출", "올림픽 연패 탈출 작전"] },
+          { text: "농구부 연패 축하", m: "B", examples: ["농구부 연패 우승", "농구부 연패 금메달"] }
+        ]
       }
     };
     const TARGETS = Object.keys(LEXICON);
@@ -2097,45 +2100,66 @@
     function josa(word, a, b) { const c = String(word || "").slice(-1).charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return b; return (c - 0xAC00) % 28 ? a : b; }
 
     /* ----- 4단계 컴퓨터 가르치기 -----
-       1~3단계와 따로, 문제마다 정해 둔 '가상의 학습 결과(learned)'에서 출발한다.
-       학생이 넣은 문장은 고른 뜻 쪽에 옆 말 1번으로 더해진다. */
+       Use the same labeled clue corpus as the word map; only known clues are learned. */
     const TEACH_MAX = 3, TEACH_WORDS = 4;
     function teachOf(t) { const c = state.teach[t] || (state.teach[t] = {}); if (!c.items) { c.items = {}; c.cur = 0; } return c; }
     function teachItem(t, i) { const c = teachOf(t); const it = c.items[i] || (c.items[i] = {}); if (!Array.isArray(it.adds)) it.adds = []; return it; }
-    // 가상 학습 결과 읽기: "행사=4/0; 없는=0/2" → { 행사: { A: 4, B: 0 }, 없는: { A: 0, B: 2 } }
-    function learnedOf(t, ck) {
-      const ids = LEXICON[t].meanings.map(m => m.id), out = {};
-      String(ck.learned || "").split(/[;\n]/).forEach(part => {
-        const [w, nums] = part.split("="); if (!w || !nums) return;
-        const ns = nums.split("/").map(x => Number(x) || 0); out[w.trim()] = {}; ids.forEach((id, i) => { out[w.trim()][id] = ns[i] || 0; });
-      });
-      return out;
-    }
     function teachAddedClues(t, ck, addition) {
       if (!addition) return [];
-      const target = clueWords(contextOf(ck.text, t).ctx);
-      const added = clueWords(contextOf(addition.text, t).ctx);
+      const vocabulary = teachVocabulary(t);
+      const target = clueWords(contextOf(ck.text, t).ctx)
+        .map(w => canonicalTeachClue(w, vocabulary)).filter(w => vocabulary.has(w));
+      const added = clueWords(contextOf(addition.text, t).ctx).map(w => canonicalTeachClue(w, vocabulary));
       const matches = {};
-      const normalizeEnding = word => {
-        const endings = ["했습니다", "하였습니다", "해요", "했어요", "합니다", "하였다", "하다", "해서", "하며", "하고", "해", "했다", "한다", "한", "은", "는", "이", "가", "을", "를", "에", "의", "도", "만", "로"];
-        const ending = endings.find(suffix => word.endsWith(suffix) && word.length - suffix.length >= 2);
-        return ending ? word.slice(0, -ending.length) : word;
-      };
       target.forEach(word => {
-        const normalizedTarget = normalizeEnding(word);
-        const n = added.filter(x => normalizeEnding(x) === normalizedTarget).length;
+        const n = added.filter(x => x === word).length;
         if (n) matches[word] = (matches[word] || 0) + n;
       });
       return Object.entries(matches).map(([word, count]) => ({ word, count }));
     }
-    function teachScores(t, ck, adds) {
-      const ctx = contextOf(ck.text, t).ctx, learned = learnedOf(t, ck), sc = {};
-      LEXICON[t].meanings.forEach(m => { sc[m.id] = 0; });
-      [...new Set(ctx)].forEach(w => { const l = learned[w]; if (l) Object.keys(sc).forEach(id => { sc[id] += l[id] || 0; }); });
-      (adds || []).forEach(a => {
-        if (sc[a.m] == null) return;
-        teachAddedClues(t, ck, a).forEach(match => { sc[a.m] += match.count; });
+    function teachVocabulary(t) {
+      const words = new Set();
+      LEXICON[t].sentences.forEach(s => clueWords(contextOf(s.text, t).ctx).forEach(w => words.add(w)));
+      return words;
+    }
+    function canonicalTeachClue(word, vocabulary) {
+      if (vocabulary.has(word)) return word;
+      const endings = ["했습니다", "하였습니다", "해요", "했어요", "합니다", "하였다", "하다", "해서", "하며", "하고", "해", "했다", "한다", "한", "은", "는", "이", "가", "을", "를", "에", "의", "도", "만", "로"];
+      const ending = endings.find(suffix => word.endsWith(suffix) && word.length - suffix.length >= 2 && vocabulary.has(word.slice(0, -suffix.length)));
+      return ending ? word.slice(0, -ending.length) : word;
+    }
+    function teachClueScoreTable(t, ck, adds) {
+      const ids = LEXICON[t].meanings.map(m => m.id), counts = {};
+      const addCount = (word, id, n) => {
+        if (counts[word] && counts[word][id] != null) counts[word][id] += n;
+      };
+      LEXICON[t].sentences.forEach(s => {
+        clueWords(contextOf(s.text, t).ctx).forEach(w => {
+          if (!counts[w]) counts[w] = Object.fromEntries(ids.map(id => [id, 0]));
+          addCount(w, s.m, 1);
+        });
       });
+      const vocabulary = teachVocabulary(t);
+      (adds || []).forEach(a => {
+        clueWords(contextOf(a.text, t).ctx).forEach(raw => {
+          const w = canonicalTeachClue(raw, vocabulary);
+          if (!vocabulary.has(w)) return;
+          if (!counts[w]) counts[w] = Object.fromEntries(ids.map(id => [id, 0]));
+          addCount(w, a.m, 1);
+        });
+      });
+      const table = {};
+      Object.entries(counts).forEach(([w, byMeaning]) => {
+        const total = ids.reduce((sum, id) => sum + byMeaning[id], 0);
+        if (total) table[w] = Object.fromEntries(ids.map(id => [id, byMeaning[id] / total]));
+      });
+      return table;
+    }
+    function teachScores(t, ck, adds) {
+      const vocabulary = teachVocabulary(t), table = teachClueScoreTable(t, ck, adds);
+      const ctx = clueWords(contextOf(ck.text, t).ctx).map(w => canonicalTeachClue(w, vocabulary)), sc = {};
+      LEXICON[t].meanings.forEach(m => { sc[m.id] = 0; });
+      voteScores(t, ctx, table).forEach((score, i) => { sc[LEXICON[t].meanings[i].id] = score; });
       const total = Object.values(sc).reduce((x, y) => x + y, 0), ids = Object.keys(sc);
       const pct = {}; ids.forEach(id => { pct[id] = total ? Math.round(sc[id] / total * 100) : Math.round(100 / ids.length); });
       const max = Math.max(...ids.map(id => sc[id])), tops = ids.filter(id => sc[id] === max);
@@ -2145,22 +2169,18 @@
       if (!adds.length) return "";
       const last = adds[adds.length - 1], before = teachScores(t, ck, adds.slice(0, -1)), after = teachScores(t, ck, adds);
       const matched = teachAddedClues(t, ck, last);
-      const scoreLine = LEXICON[t].meanings.map((m, mi) => `${SHORT[mi]} ${m.name} ${after.sc[m.id]}표 (${after.pct[m.id]}%)`).join(" · ");
-      if (!matched.length) return `이번 문장에는 이 문항의 옆 말(${clueWords(contextOf(ck.text, t).ctx).join(", ") || "없음"})이 없어 점수에 반영되지 않았어요. 현재 점수: ${scoreLine}`;
-      const clueLine = matched.map(x => `'${x.word}' +${x.count}표`).join(", ");
-      if (!after.pick) return `이번 문장의 ${clueLine}가 반영됐어요. 현재 점수는 비겼어요: ${scoreLine}`;
-      if (after.pick !== before.pick) return `이번 문장의 ${clueLine}가 반영되어 판단이 바뀌었어요. ${mLabel(t, after.pick)} ${after.pct[after.pick]}%. 현재 점수: ${scoreLine}`;
-      return `이번 문장의 ${clueLine}가 반영됐지만, 아직 판단은 바뀌지 않았어요. ${mLabel(t, after.pick)} ${after.pct[after.pick]}%. 현재 점수: ${scoreLine}`;
+      const scoreLine = LEXICON[t].meanings.map((m, mi) => `${SHORT[mi]} ${m.name} ${after.sc[m.id].toFixed(2)}표 (${after.pct[m.id]}%)`).join(" · ");
+      if (!matched.length) return `이번 문장에는 이 문제의 단서(${clueWords(contextOf(ck.text, t).ctx).join(", ") || "없음"})가 없어 단어 지도의 판단 점수는 달라지지 않았어요. 현재 점수: ${scoreLine}`;
+      const clueLine = matched.map(x => `'${x.word}' ${mLabel(t, last.m)} 쪽 학습 ${x.count}회`).join(", ");
+      if (!after.pick) return `단어 지도에 ${clueLine}를 더했어요. 단서 점수표를 비율로 나누니 현재 판단은 비겼어요: ${scoreLine}`;
+      if (after.pick !== before.pick) return `단어 지도에 ${clueLine}를 더해 판단이 바뀌었어요. ${mLabel(t, after.pick)} ${after.pct[after.pick]}%. 현재 점수: ${scoreLine}`;
+      return `단어 지도에 ${clueLine}를 더했지만 아직 판단은 바뀌지 않았어요. ${mLabel(t, after.pick)} ${after.pct[after.pick]}%. 현재 점수: ${scoreLine}`;
     }
     // 판단 근거: 고른 뜻 쪽에서 센 옆 말
     function teachHits(t, ck, adds, m) {
-      const ctx = contextOf(ck.text, t).ctx, learned = learnedOf(t, ck), hit = new Set();
-      ctx.forEach(w => { if (learned[w] && learned[w][m] > 0) hit.add(w); });
-      (adds || []).forEach(a => {
-        if (a.m !== m) return;
-        teachAddedClues(t, ck, a).forEach(match => hit.add(match.word));
-      });
-      return [...hit];
+      const vocabulary = teachVocabulary(t), table = teachClueScoreTable(t, ck, adds);
+      return [...new Set(clueWords(contextOf(ck.text, t).ctx).map(w => canonicalTeachClue(w, vocabulary)))]
+        .filter(w => table[w] && table[w][m] > 0);
     }
     function mLabel(t, id) { const mi = meaningInfo(t, id); return mi ? `${mi.short} ${mi.name}` : ""; }
 
@@ -2171,9 +2191,11 @@
       const basis = r.pick ? teachHits(t, s, it.adds, r.pick) : [];
       const feedback = it.adds.length ? teachFeedback(t, s, it.adds) : it.say;
       const targetClues = clueWords(contextOf(s.text, t).ctx);
-      const clueExample = targetClues.length >= 2
+      const vocabulary = teachVocabulary(t);
+      const knownTargetClues = [...new Set(targetClues.map(w => canonicalTeachClue(w, vocabulary)).filter(w => vocabulary.has(w)))];
+      const clueExamples = s.examples || [targetClues.length >= 2
         ? `${targetClues[0]} ${t} ${targetClues[1]} 이야기`
-        : targetClues.length === 1 ? `${targetClues[0]} ${t} 이야기` : `${t} 주변의 새로운 말`;
+        : targetClues.length === 1 ? `${targetClues[0]} ${t} 이야기` : `${t} 주변의 새로운 말`];
       const bars = L.meanings.map((m, mi) => `<div class="pbar-row"><span class="pbar-label">${SHORT[mi]} ${esc(m.name)}</span>
           <span class="pbar-track"><span class="pbar-fill" style="width:${r.pct[m.id]}%; background:${MEANING_COLORS[mi]}"></span></span>
           <span class="pbar-n">${r.pct[m.id]}%</span></div>`).join("");
@@ -2187,7 +2209,7 @@
           <div class="duel-dots">${L.checks.map((x, i) => `<button type="button" class="duel-dot ${i === cur ? "now" : ""}" onclick="teachGo(${i})">문제 ${i + 1}${ok(i) ? " ⭕" : ""}</button>`).join("")}</div>
           <div class="check-card">
             <div class="q-lead">다음은 학습을 마친 컴퓨터가 아래 문장의 '${esc(t)}'를 어떤 뜻으로 판단했는지 나타낸 것입니다.</div>
-            <p class="rule-note"><b>컴퓨터가 아는 단서:</b> ${targetClues.map(esc).join(", ") || "없음"}<br>넣는 문장에 같은 단서가 들어 있으면 선택한 뜻에 표를 더해요. 조사·어미가 붙어도 알아봐요(예: ‘축하해’ → ‘축하’). 뜻이 비슷해도 목록에 없는 새 단서는 아직 세지 않아요.<br>예: “${esc(clueExample)}”</p>
+            <p class="rule-note"><b>문장 속 옆 말:</b> ${targetClues.map(esc).join(", ") || "없음"}<br><b>단어 지도에 등록된 단서:</b> ${knownTargetClues.map(esc).join(", ") || "없음"}<br>4단계도 단어 지도의 전체 학습 단서표를 사용해요. 등록된 단서만 뜻별로 세며, 새 단어는 세지 않아요. 조사·어미가 붙어도 이미 아는 단서로 찾아요.<br>예: ${clueExamples.map(x => `“${esc(x)}”`).join(" 또는 ")}</p>
             <div class="q-data">
               <div><span class="q-key">문장</span> ${sentHTML(t, s.text)}</div>
               <div><span class="q-key">컴퓨터의 판단</span> ${r.pick ? `${esc(mLabel(t, r.pick))} ${r.pct[r.pick]}%` : "판단할 수 없음"}</div>
@@ -2199,7 +2221,7 @@
             ${it.adds.length ? `<div class="add-list">${it.adds.map(a => {
               const matches = teachAddedClues(t, s, a);
               const clueText = matches.length
-                ? `반영된 단서: ${matches.map(x => `${esc(x.word)} +${x.count}표`).join(", ")}`
+                ? `단어 지도에 반영된 문제 단서: ${matches.map(x => `${esc(x.word)} · ${esc(mLabel(t, a.m))} 쪽 학습 ${x.count}회`).join(", ")}`
                 : `반영된 단서 없음 · 이 문항의 옆 말: ${clueWords(contextOf(s.text, t).ctx).map(esc).join(", ") || "없음"}`;
               return `<div class="add-item">넣은 문장: ${sentHTML(t, a.text)} ${pill(t, a.m)}<small class="teach-clue-result">${clueText}</small></div>`;
             }).join("")}</div>` : ""}
