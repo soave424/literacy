@@ -268,11 +268,6 @@ function renderModel() {
           <div class="basis">근거: ${s.basis}</div>
         </div>
       </div>`).join("")}</div>
-    <div class="band cmp">단계마다 사람의 근거와 컴퓨터의 근거 견주기 <small>— 판단 근거 비교 원리(1)</small></div>
-    <div class="band move">점검 주체가 옮겨 간다: 학생이 점검 → AI가 시범 → 학생 혼자 <small>— 점검 주체 이양 원리(2)</small></div>
-    <div class="band cycle">↻ 새 문맥을 만나면 1단계로 돌아가 다시 읽고, 정리한 읽기 순서를 다른 글 읽기에 쓴다 (순환)</div>
-    <div class="band media">모형 밖 · 학습 매체: 각 단계에서 학생과 컴퓨터가 하는 일을 눈에 보이게 한다 (교사 제작 실습 앱 3종) — 단계 가시화 매체 원리(6)</div>
-
     <div class="sec-title">차시 열기</div>
     <div class="lesson-grid">${LESSONS.map(l => `
       <button class="lcard" onclick="go('lesson','${l.id}')">
@@ -466,11 +461,9 @@ function renderTeacher() {
     </div>
     <div class="tgrid">
       <div class="card">
-        <h3>🔌 시트 연결 상태</h3>
+        <h3>🔌 서비스 상태</h3>
         <div class="kv">
           <span>상태</span><span>${st}</span>
-          <span>API_URL</span><span><code>${esc(CFG.API_URL || "(비어 있음)")}</code></span>
-          <span>앱 1 주소</span><span><code>${esc(CFG.APP1_URL || "(비어 있음)")}</code></span>
           <span>가명 처리</span><span>${CFG.PSEUDONYMIZE ? "켜짐 — 학교명은 S-xxxxxx 코드로 보내요" : "꺼짐"}</span>
         </div>
         <p style="margin-bottom:0"><button class="btn" onclick="checkConn(true)">다시 확인</button></p>

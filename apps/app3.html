@@ -978,6 +978,7 @@
     .human-item { padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
     .human-item.on { border-color: #16a34a; background: #f0fdf4; color: #166534; }
     .no-badge { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 800; border-radius: 999px; height: 34px; padding: 0 14px; cursor: pointer; font-family: inherit; font-size: 14px; white-space: nowrap; }
+    .home-link { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 50; display: inline-flex; align-items: center; border: 1px solid #c7d2fe; background: #fff; color: #3730a3; font-weight: 800; border-radius: 12px; min-height: 44px; padding: 0 16px; text-decoration: none; font-size: 15px; white-space: nowrap; box-shadow: 0 4px 16px rgba(15,23,42,.18); }
     .no-edit { display: inline-flex; gap: 6px; align-items: center; }
     .start-wrap { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
     .start-card { background: #fff; border: 1px solid var(--border); border-radius: 18px; padding: 36px 32px; text-align: center; max-width: 520px; width: 100%; box-shadow: 0 10px 30px rgba(15,23,42,.06); }
@@ -1432,10 +1433,11 @@
       return `<header><h1>같은 낱말, 옆 말로 뜻을 나눌 수 있을까?</h1>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
           <div class="stage-nav">${TAB_NAMES.map((n, i) => `<button class="stage-tab ${active === i ? "active" : ""}" onclick="switchStage(${i})">${n}</button>`).join("")}</div>
+          <a class="home-link" href="../index.html">🏠 활동 목록</a>
           ${editingNo
             ? `<span class="no-edit"><input class="num-input" id="schoolEdit" type="text" value="${esc(state.school)}" placeholder="학교명" style="width:110px; height:34px"><input class="num-input" id="noEdit" type="text" inputmode="numeric" value="${esc(state.studentNo)}" placeholder="260601" style="width:90px; height:34px"><button type="button" class="no-badge" onclick="saveNoEdit()">확인</button></span>`
             : `<button type="button" class="no-badge" onclick="startNoEdit()" title="눌러서 고치기">🙋 ${state.studentNo ? `${esc(state.school)} ${esc(state.studentNo)}` : "번호 없음"}</button>`}
-          ${state.studentNo ? "" : `<button type="button" class="no-badge home-btn" onclick="goStartScreen()">🏠 처음 화면</button>`}
+          ${state.studentNo ? "" : `<button type="button" class="no-badge home-btn" onclick="goStartScreen()">🙋 번호 입력</button>`}
         </div></header>`;
     }
     // 처음 화면(학교명·번호 입력)으로 돌아가기: 선생님용 버튼, 관리자 페이지의 '처음 화면으로'
@@ -1473,6 +1475,7 @@
           </div>
           <button type="button" class="big-btn" style="min-height:48px; width:100%; margin-top:12px" onclick="startApp()">시작하기 →</button>
           <div style="color:#dc2626; font-size:13px; font-weight:700; min-height:20px; margin-top:8px">${esc(startErr)}</div>
+          <a class="home-link" href="../index.html">🏠 활동 목록</a>
           <button type="button" class="teacher-skip" onclick="skipStart()">선생님: 번호 없이 둘러보기</button>
           ${HAS_SERVER ? "" : `<div style="margin-top:6px"><a class="teacher-skip" href="admin.html">🛠️ 선생님: 어구 관리(관리자 페이지)</a></div>`}
         </div></div>`;
