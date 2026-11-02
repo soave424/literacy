@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>주변 단어는 어떤 단서가 될까?</title>
+  <style>
+* { box-sizing: border-box; }
+:root { --border: #d8dde6; --text: #1f2937; --muted: #6b7280; --bg: #f6f8fb; --card: #ffffff; --primary: #2563eb; --primary-hover: #1d4ed8; --selected: #111827; --selected-text: #ffffff; --button-bg: #ffffff; --button-hover: #f1f5f9; --target-color: #fef08a; --target-border: #eab308; --context-color: #bfdbfe; --context-border: #3b82f6; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif; color: var(--text); background: var(--bg); line-height: 1.5; user-select: none; }
+.app { width: min(1600px, 100%); margin: 0 auto; padding: 16px; }
+header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+h1 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; }
+.stage-nav { display: flex; gap: 8px; background: #e2e8f0; padding: 4px; border-radius: 10px; }
+.stage-tab { border: none; background: transparent; padding: 8px 16px; font-size: 14px; font-weight: 700; border-radius: 7px; cursor: pointer; color: #64748b; transition: all 0.2s ease; }
+.stage-tab.active { background: #ffffff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.label { display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px; }
+.window-buttons { display: flex; gap: 6px; }
+button, select { font: inherit; }
+.window-btn { border: 1px solid var(--border); background: var(--button-bg); color: var(--text); border-radius: 8px; cursor: pointer; transition: all 0.15s ease; }
+.window-btn { width: 42px; height: 38px; font-weight: 700; }
+.window-btn:hover { background: var(--button-hover); }
+.window-btn.active { background: var(--selected); color: var(--selected-text); border-color: var(--selected); }
+select { width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font-weight: 600; }
+.table-wrap { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+table { border-collapse: separate; border-spacing: 0; min-width: 1800px; width: 100%; font-size: 13px; }
+th, td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 6px; text-align: center; background: #fff; min-width: 76px; }
+th { position: sticky; top: 0; z-index: 10; background: #f1f5f9; font-weight: 700; color: #334155; }
+th:first-child, td:first-child { position: sticky; left: 0; z-index: 20; min-width: 100px; font-weight: 700; background: #f8fafc; border-right: 2px solid var(--border); }
+th:first-child { z-index: 30; background: #e2e8f0; }
+.bottom-area { display: flex; justify-content: flex-end; padding: 8px 0 16px; }
+.next-btn { min-width: 140px; min-height: 44px; padding: 0 20px; background: var(--selected); color: white; border: none; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.questions-grid { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+.question-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); transition: border-color 0.2s ease; }
+.question-card.timer-active { border-color: var(--primary); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12); }
+.question-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.q-badge { background: var(--primary); color: white; font-weight: 800; font-size: 13px; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+.q-text { font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.5; margin: 0; }
+.q-action-area { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.timer-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; transition: all 0.2s ease; }
+.timer-btn:hover { background: #e2e8f0; color: #0f172a; }
+.timer-running-box { display: flex; align-items: center; gap: 12px; background: #eff6ff; border: 1px solid var(--context-border); padding: 12px 16px; border-radius: 8px; color: #1e40af; font-weight: 700; }
+.clock-icon { font-size: 20px; animation: spin-pulse 2s infinite linear; }
+.progress-bar-bg { flex: 1; height: 8px; background: #dbeafe; border-radius: 4px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 1s linear; }
+.answer-box { margin-top: 12px; padding: 16px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; color: #14532d; animation: fadeIn 0.4s ease; }
+.answer-title { font-weight: 800; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; color: #15803d; }
+.student-answer-area { margin-top: 12px; }
+.student-answer-label { display: block; font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 6px; }
+.student-answer-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--text); background-color: #f8fafc; resize: vertical; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.student-answer-input:focus { border-color: var(--primary); background-color: #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+.class-panel { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin: 16px 0; }
+.class-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #eef2f7; padding-bottom: 12px; margin-bottom: 16px; }
+.class-head h2 { margin: 8px 0 4px; font-size: 20px; font-weight: 800; color: #0f172a; }
+.class-head p { margin: 0; color: #475569; font-size: 14px; }
+.class-total { font-size: 14px; color: #475569; white-space: nowrap; }
+.class-total b { color: #4f46e5; }
+.live { color: #16a34a; font-size: 12px; font-weight: 700; }
+.ai-think { margin-top: 12px; background: #faf5ff; border: 1px solid #e9d5ff; color: #3b0764; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; line-height: 1.6; }
+.class-form label { display: block; font-weight: 800; font-size: 14px; margin: 12px 0 6px; color: #334155; }
+.class-form input { width: 100%; min-height: 46px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 15px; }
+.class-form input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+.class-msg { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f0fdf4; border: 1px solid #86efac; color: #166534; font-size: 14px; font-weight: 700; }
+.class-msg.warn { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+.class-summary { margin-top: 16px; background: #0f172a; color: #fff; border-radius: 12px; padding: 14px 16px; font-size: 15px; font-weight: 700; line-height: 1.7; }
+.stage-nav { flex-wrap: wrap; }
+.num-input { width: 90px; height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; }
+.ai-card { display: flex; gap: 14px; align-items: flex-start; background: #faf5ff; border: 1px solid #d8b4fe; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; animation: fadeIn 0.4s ease; }
+.ai-card .face { font-size: 34px; line-height: 1; }
+.ai-card .say { flex: 1; color: #3b0764; font-size: 15px; font-weight: 600; line-height: 1.7; }
+.ai-card .say b { color: #6b21a8; }
+.ai-card button { border: none; background: #7c3aed; color: #fff; font-weight: 800; border-radius: 10px; min-height: 38px; padding: 0 14px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.ai-again { border: 1px solid #d8b4fe; background: #faf5ff; color: #6b21a8; font-weight: 800; border-radius: 8px; height: 38px; padding: 0 12px; cursor: pointer; font-family: inherit; }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+.panel-title { font-size: 15px; font-weight: 800; color: #0f172a; margin: 0 0 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.read-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+.read-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.read-card.done { border-color: #86efac; background: #f7fef9; }
+.read-card .no { font-size: 12px; font-weight: 800; color: #64748b; margin-bottom: 4px; }
+.read-text { font-size: 19px; line-height: 2.1; margin-bottom: 6px; }
+.tok { display: inline-block; padding: 0 5px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+.tok:hover { background: #f1f5f9; }
+.tok.is-target { background: var(--target-color); border-color: var(--target-border); font-weight: 800; cursor: default; }
+.tok.is-clue { background: #dcfce7; border-color: #16a34a; font-weight: 800; }
+.tok.in-win { box-shadow: inset 0 -6px 0 var(--context-color); }
+.frame-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+.frame-box .frame-title { font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 6px; }
+.frame-tpl { font-size: 13px; color: #6b21a8; background: #faf5ff; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; font-weight: 700; }
+table.s2 { min-width: 0; width: auto; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+table.s2 th, table.s2 td { min-width: 52px; padding: 6px 4px; }
+table.s2 th:first-child, table.s2 td:first-child { min-width: 250px; text-align: left; }
+table.s2 th.shared { color: var(--primary); }
+.ai-say { background: #faf5ff; border: 1px solid #e9d5ff; color: #3b0764; border-radius: 10px; padding: 12px 14px; font-size: 15px; font-weight: 600; line-height: 1.7; margin-bottom: 12px; }
+.ai-say b { color: #6b21a8; }
+.check-card { border: 2px solid #0f172a; border-radius: 14px; padding: 16px; background: #fff; margin-top: 12px; }
+.check-card .q { font-size: 22px; line-height: 2; margin: 4px 0 8px; }
+.step-title { font-size: 14px; font-weight: 800; color: #0f172a; margin: 12px 0 6px; }
+.big-btn { border: none; border-radius: 10px; background: #0f172a; color: #fff; font-weight: 800; font-size: 14px; min-height: 42px; padding: 0 18px; cursor: pointer; font-family: inherit; }
+.big-btn.light { background: #fff; color: #0f172a; border: 1.5px solid #0f172a; }
+.big-btn.on { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+.why-input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; background: #f8fafc; resize: vertical; }
+.why-input:focus { outline: none; border-color: var(--primary); background: #fff; }
+.human-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.human-item { padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+.human-item.on { border-color: #16a34a; background: #f0fdf4; color: #166534; }
+.start-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+.start-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 800; color: #334155; }
+.start-form .num-input { width: 100%; height: 48px; font-size: 18px; text-align: center; }
+.story-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 16px; }
+.story-box { margin-bottom: 0; position: sticky; top: 10px; }
+.story-text { font-size: 18px; line-height: 2.2; word-break: keep-all; }
+.story-text p { margin: 0 0 10px; text-indent: 0.6em; }
+.stok { cursor: pointer; border-radius: 999px; padding: 1px 2px; transition: background 0.15s; }
+.stok:hover { background: #f1f5f9; }
+.stok.found { border: 2.5px solid var(--wc); padding: 1px 6px; font-weight: 800; color: var(--wc); background: #fff; }
+.stok.shake { animation: shake 0.35s; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.found-count { font-size: 13px; color: #16a34a; }
+.vote-chart { margin-top: 6px; }
+.vbar-row { display: grid; grid-template-columns: minmax(80px, 38%) 1fr 36px; gap: 8px; align-items: center; margin: 4px 0; font-size: 13px; font-weight: 700; color: #334155; }
+.vbar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vbar-track { height: 16px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.vbar-fill { display: block; height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+.vbar-n { text-align: right; }
+.guess-pill { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; color: #fff; }
+.q-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+ .app { padding: 10px; }
+ header { gap: 8px; margin-bottom: 10px; }
+ h1 { font-size: 18px; line-height: 1.35; }
+ header > div { width: 100%; min-width: 0; }
+ .stage-nav { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; flex: 1 1 100%; min-width: 0; }
+ .stage-tab { white-space: nowrap; padding: 8px 10px; font-size: 13px; }
+ .section, .panel, .class-panel, .frame-box { padding: 12px; border-radius: 12px; }
+ .ai-card { flex-direction: column; gap: 8px; }
+ .ai-card .say { font-size: 14px; }
+ .ai-card button { width: 100%; }
+ .ai-again { height: 34px; font-size: 13px; }
+ .read-text { font-size: 18px; }
+ table.s2 th, table.s2 td { min-width: 40px; padding: 5px 3px; font-size: 12px; }
+ table.s2 th:first-child, table.s2 td:first-child { min-width: 185px; max-width: 200px; }
+ .check-card { padding: 12px; }
+ .check-card .q { font-size: 19px; }
+ .q-line { font-size: 13px; }
+ .next-btn { width: 100%; }
+ .story-layout { grid-template-columns: 1fr; }
+ .story-box { position: static; }
+ .story-text { font-size: 17px; }
+ .start-form { grid-template-columns: 1fr; }
+ .bottom-area { padding-bottom: 24px; }
+}
+.read-card.has { border-color: var(--target-border); border-width: 2px; }
+.tok.plain { cursor: default; }
+.tok.plain:hover { background: none; }
+.tok.out-win { border: 2px dashed #ef4444; background: #fef2f2; }
+.msg { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 14px; font-weight: 700; line-height: 1.7; }
+.msg.ok { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.msg.warn { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+.row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+table.rt { min-width: 0; width: auto; }
+table.rt th, table.rt td { min-width: 76px; padding: 6px 4px; }
+table.rt th:first-child, table.rt td:first-child { min-width: 80px; }
+table.rt td.nz { background: #eff6ff; color: var(--primary); font-weight: 800; }
+table.rt td.bad { background: #fef2f2 !important; box-shadow: inset 0 0 0 2px #ef4444; }
+table.rt th.pickable { cursor: pointer; }
+table.rt th.pickable:hover { background: #e0e7ff; }
+table.rt th.picked { background: #bbf7d0 !important; color: #166534; }
+table.rt th.wrong { background: #fecaca !important; color: #991b1b; }
+table.rt td.shared { background: #dcfce7 !important; color: #166534; font-weight: 800; }
+.cstep { display: inline-flex; align-items: center; gap: 4px; }
+.cstep button { width: 24px; height: 26px; border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; font-weight: 800; padding: 0; font-family: inherit; color: #334155; }
+.cstep button:hover { background: #f1f5f9; }
+.cstep b { min-width: 14px; display: inline-block; }
+.choice-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.bridge { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 12px; padding: 10px 14px; font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+@media (max-width: 640px) {
+ table.rt th, table.rt td { min-width: 66px; padding: 5px 3px; font-size: 12px; }
+ table.rt th:first-child, table.rt td:first-child { min-width: 64px; }
+ .window-btn { width: 40px; }
+ .choice-row .big-btn { flex: 1 1 auto; }
+}
+.shelf-wrap { background: #8a5a2b; border-radius: 14px; padding: 16px 12px 0; margin-top: 4px; box-shadow: inset 0 6px 12px rgba(0,0,0,.25); }
+.shelf { display: flex; justify-content: center; align-items: flex-end; gap: 10px; }
+.shelf-board { height: 16px; background: #5b3412; margin: 0 -12px; border-radius: 0 0 14px 14px; box-shadow: inset 0 3px 0 #a0682f; }
+.spine { writing-mode: vertical-rl; text-orientation: upright; width: 66px; border-radius: 6px 6px 2px 2px; padding: 14px 0; display: flex; align-items: center; gap: 8px; box-shadow: inset -7px 0 0 rgba(0,0,0,.07), inset 7px 0 0 rgba(255,255,255,.4), 0 -2px 4px rgba(0,0,0,.15); font-size: 19px; font-weight: 700; color: #1f2937; }
+.sp-tok { padding: 6px 3px; border-radius: 8px; cursor: pointer; border: 2px solid rgba(0,0,0,.08); background: rgba(255,255,255,.55); letter-spacing: 1px; transition: background .15s; }
+.sp-tok:hover { background: #fff; }
+.sp-target { background: #fff; border: 3px solid var(--tc); color: var(--tc); font-weight: 900; cursor: default; }
+.sp-tok.shake { animation: shake 0.35s; }
+.basket-name { display: inline-block; color: #fff; background: var(--tc); border-radius: 6px; padding: 1px 8px; font-weight: 800; }
+@media (max-width: 640px) {
+ .shelf { gap: 6px; }
+ .spine { width: 48px; font-size: 16px; gap: 6px; }
+}
+.sp-plain { cursor: default; }
+.sp-plain:hover { background: rgba(255,255,255,.55); }
+table.rt tr.locked td { background: #f8fafc; }
+.big-btn:disabled { opacity: .55; cursor: default; }
+.frame-tpl, .guess-pill, .found-count, .class-total, .start-form label, .vbar-row, .step-title, .label, .msg, .why-input, .human-item, .class-form label, .ai-again, .class-msg, .bridge, .stage-tab { font-size: 15px !important; }
+table.rt { font-size: 15px; }
+table.rt th, table.rt td { font-size: 15px !important; }
+.q-text { font-size: 17px; }
+@media (max-width: 640px) {
+ .stage-tab { font-size: 15px !important; }
+ table.rt th, table.rt td { font-size: 15px !important; min-width: 70px; }
+}
+.overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.overlay .ai-card { max-width: 600px; width: 100%; margin: 0; box-shadow: 0 20px 40px rgba(15,23,42,.25); flex-direction: column; align-items: stretch; }
+.overlay .ai-card .face { font-size: 40px; text-align: center; }
+.overlay .ai-card button { min-height: 48px; font-size: 17px; }
+.card-name { font-size: 19px; font-weight: 900; color: #5b21b6; margin-bottom: 8px; }
+.card-row { display: flex; gap: 10px; margin: 6px 0; font-size: 16px; line-height: 1.6; }
+.card-row b { white-space: nowrap; min-width: 78px; }
+.card-todo { margin-top: 10px; padding: 10px 12px; background: #fff; border-radius: 10px; font-size: 16px; font-weight: 800; color: #0f172a; }
+.f2-row { font-size: 17px; line-height: 2.4; margin: 4px 0; }
+.blank { border: none; border-bottom: 2px solid #7c3aed; background: #faf5ff; min-width: 140px; width: 180px; font: inherit; font-size: 17px; padding: 2px 8px; margin: 0 4px; border-radius: 6px 6px 0 0; }
+.blank:focus { outline: none; background: #f3e8ff; }
+@media (max-width: 640px) {
+ .blank { width: 130px; min-width: 110px; }
+ .card-row { flex-direction: column; gap: 2px; }
+}
+.tri-map { position: relative; height: 300px; background: #f8fafc; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.tri-chip { position: absolute; transform: translate(-50%, -50%); color: #fff; font-weight: 900; font-size: 20px; padding: 8px 18px; border-radius: 999px; box-shadow: 0 4px 10px rgba(0,0,0,.15); transition: left 1s ease, top 1s ease; white-space: nowrap; }
+.slot-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.slot { width: 130px; min-height: 46px; border: 2px solid var(--border); border-radius: 10px; padding: 0 12px; font: inherit; font-size: 18px; }
+.slot:focus { outline: none; border-color: #7c3aed; }
+.slot:disabled { background: #f1f5f9; }
+.slot-word { color: #fff; font-weight: 900; font-size: 19px; padding: 8px 14px; border-radius: 10px; }
+.slot-btn { min-height: 46px; border: none; border-radius: 10px; background: #0f172a; color: #fff; font-weight: 800; font-size: 16px; padding: 0 16px; cursor: pointer; font-family: inherit; }
+.slot-done { font-size: 16px; font-weight: 800; color: #16a34a; }
+@media (max-width: 640px) {
+ .tri-map { height: 260px; }
+ .tri-chip { font-size: 18px; padding: 6px 14px; }
+ .slot { width: 110px; }
+}
+.class-form input.slot { width: 120px !important; flex: 0 0 auto; }
+.slot-row { flex-wrap: nowrap; }
+.ai-think { font-size: 15px !important; }
+@media (max-width: 640px) {
+ .class-form input.slot { width: 100px !important; }
+ .slot-btn { padding: 0 12px; font-size: 15px; }
+}
+.class-form input.slot { width: auto !important; flex: 1 1 auto; min-width: 0; }
+.slot-row .slot-word { flex: 0 0 auto; min-width: 64px; text-align: center; }
+.slot-row .slot-btn, .slot-row .slot-done { flex: 0 0 auto; }
+@media (max-width: 640px) {
+ .class-form input.slot { width: auto !important; }
+}
+.bottom-area { justify-content: space-between; gap: 10px; align-items: center; }
+.prev-btn { min-height: 44px; padding: 0 18px; background: #fff; color: #0f172a; border: 1.5px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 15px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.prev-btn:hover { background: #f1f5f9; }
+@media (max-width: 640px) {
+ .bottom-area .next-btn { width: auto; flex: 1 1 auto; }
+}
+.timer-box { font-size: 26px; font-weight: 900; text-align: center; color: #0f172a; background: #f1f5f9; border-radius: 12px; padding: 8px; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.timer-box.warn { color: #fff; background: #e11d48; }
+.timer-box.done { color: #fff; background: #64748b; font-size: 20px; }
+.tri-map.mini { height: 200px; }
+</style>
+  <!-- 깃허브 배포: 시트 연결 설정과 연결 파일 -->
+  <script src="../config.js"></script>
+  <script src="../gas-bridge.js"></script>
+</head>
+<body>
+<main id="app" class="app"></main>
+
+  <script>
+/* =====================================================================
+ 주변 단어는 어떤 단서가 될까? (앱 2 · Word2Vec)
+ 문맥 추론 점검 모형: 문맥 살피기 → 문맥 단서 세기 → 뜻 추론하기 → 추론 점검·수정하기
+ ★ 선생님이 바꾸는 곳 ★
+ - APPLE           : 1단계 '사과' 두 문장 (책 제목 밖 예시)
+ - BOOKS_TOKENIZED : 2~3단계 책장의 책 제목 6권 (띄어쓰기로 나눈 낱말)
+ - TARGETS         : 2~3단계 목표 낱말 / PRACTICE : 함께 세기 연습 낱말
+ - STORY           : 글 읽기 · 4단계 '다시 읽는 글'
+ ※ 안내 문구의 예시는 활동 자료(책 제목)에서 가져오지 않습니다.
+ ===================================================================== */
+const APPLE = {
+ word: "사과",
+ sentences: [
+  { text: "엄마가 빨간 사과 한 개 주셨다.", meaning: "fruit" },
+  { text: "동생은 나에게 사과 한마디 없었다.", meaning: "sorry" }
+ ],
+ meanings: { fruit: "먹는 과일", sorry: "잘못을 비는 말" },
+ windows: [1, 2]   // 초등은 윈도우 1·2만 견준다 (지침 4.3)
+};
+const BOOKS_TOKENIZED = [
+ ["무서운", "생각", "두근두근", "떨림"],
+ ["두근두근", "처음", "도서관"],
+ ["두근두근", "마음", "뭘까"],
+ ["두근두근", "걱정", "대장"],
+ ["두근두근", "불안"],
+ ["두근두근", "처음", "만나요"]
+];
+const WORDS = [
+ "걱정", "대장", "도서관", "두근두근", "떨림", "마음",
+ "만나요", "무서운", "뭘까", "불안", "생각", "처음"
+];
+const TARGETS = ["걱정", "불안", "처음"];
+const PRACTICE = "처음";                         // 함께 세기 연습 낱말 (지침 3.1)
+const COUNT_ORDER = [PRACTICE, ...TARGETS.filter(t => t !== PRACTICE)];
+const S_WIN = 1;   // 2~3단계 윈도우: 책 제목이 짧아 1칸이면 옆 말을 모두 봐요
+// 관계표 칸: 목표 낱말이 나온 책 제목의 다른 낱말들
+const COLS = (() => {
+ const s = new Set();
+ BOOKS_TOKENIZED.forEach(b => { if (TARGETS.some(t => b.includes(t))) b.forEach(w => s.add(w)); });
+ return WORDS.filter(w => s.has(w) && !TARGETS.includes(w));
+})();
+const VALUE_QUESTIONS = [
+ {
+  id: 1,
+  question: "사람과 컴퓨터의 단어 의미 이해 방법은 무엇이 비슷한가요?",
+  answer: "둘 다 낱말 옆에 함께 나온 말(문맥)을 단서로 뜻을 짐작합니다. 사람이 모르는 낱말을 앞뒤 문장으로 짐작하듯, 컴퓨터도 옆에 나온 말을 세어 비슷한 낱말을 찾습니다. 그리고 둘 다 새 문장을 더 많이 읽으면 처음 짐작을 고칠 수 있습니다."
+ },
+ {
+  id: 2,
+  question: "사람과 컴퓨터의 단어 의미 이해 방법은 무엇이 다른가요?",
+  answer: "사람은 경험과 상황, 낱말의 순서와 앞뒤 문장 전체를 함께 생각하며 뜻을 이해합니다. 컴퓨터는 뜻을 아는 것이 아니라 정해진 칸(윈도우) 안에서 함께 나온 횟수를 셉니다. 그래서 '국물이 매우 뜨겁다 / 차갑다'처럼 옆에 나온 말이 같으면 뜻이 반대여도 비슷하다고 여길 수 있습니다."
+ },
+ {
+  id: 3,
+  question: "컴퓨터가 내 질문에 대답하는 것이 그 의미를 이해하고 말했다 생각할 수 있나요?",
+  answer: "그렇게 보기는 어렵습니다. 컴퓨터는 많은 문장에서 함께 나온 말을 세고 계산해서 알맞을 가능성이 높은 말을 고른 것입니다. 이해한 것처럼 보일 수 있지만, 사람처럼 경험하고 생각하며 뜻을 아는 것은 아닙니다. 그래서 컴퓨터의 대답도 근거를 확인하며 읽어야 합니다."
+ }
+];
+const TAB_NAMES = ["📖 글 읽기", "1단계: 문맥 살피기", "2단계: 문맥 단서 세기", "3단계: 뜻 추론하기", "4단계: 추론 점검·수정하기", "💬 생각 나누기"];
+// 단계로 넘어갈 때 뜨는 설명 카드 (사람 / 컴퓨터 / 할 일)
+const STAGE_CARDS = {
+ 0: { say: "안녕하세요! 저는 컴퓨터예요. 낱말의 뜻은 몰라요.<br>글에서 <b>걱정·불안·처음</b>을 모두 찾아 눌러 보세요." },
+ 1: { name: "1단계 · 문맥 살피기", human: "글을 읽다가 모르는 낱말이 나오면, 문맥을 살펴 뜻을 짐작해요.", ai: "컴퓨터도 낱말의 뜻을 알기 위해 문맥을 살펴요.", todo: "두 '사과'가 다른 뜻이라는 것을 알려 주는 말을 눌러요." },
+ "1b": { name: "1단계 · 윈도우", say: "컴퓨터도 우리처럼 주변을 살펴서 말의 뜻을 알게 하려면 어떻게 해야 할까요?<br><b>숫자가 필요해요.</b><br>'주변'을 어디까지로 볼지 정해 주는 것이 <b>윈도우</b>예요.", todo: "윈도우 1, 2를 모두 눌러 보세요." },
+ 2: { name: "2단계 · 문맥 단서 세기", ai: "사람이 숫자로 정해 준 문맥의 범위를 <b>윈도우</b>라고 해요. 윈도우(window)는 영어로 '창문'이에요. 컴퓨터는 창문으로 보이는 만큼만 보고, 그 안에 나온 낱말이 몇 번 나왔는지 세요.", todo: "책장에서 걱정·처음·불안 바로 위아래 말을 세어 표에 적어요." },
+ 3: { name: "3단계 · 뜻 추론하기", ai: "문맥 안에 나온 낱말이 비슷하면, 뜻도 비슷하다고 판단해요.", todo: "세 낱말에 모두 들어 있는 옆 말을 찾아요." },
+ "4t": { name: "⏰ 시간이 끝났어요", say: "" },
+ 4: { name: "4단계 · 추론 점검·수정하기", human: "새 문장을 읽고 처음 짐작을 유지하거나 고쳐요.", ai: "새 문장을 다시 세어 생각을 바꿔요.", todo: "걱정·불안·처음 옆에 올 낱말을 넣어 컴퓨터의 생각을 바꿔 봐요." }
+};
+// 단계 끝 문장 틀 (지침 1.2)
+const FRAMES = {
+ 1: "나는 낱말 앞뒤의 ○○까지 읽었고, AI는 양옆으로 △칸까지만 본다.",
+ 2: "사람은 ○○를 단서로 골랐고, AI는 △△를 □번 세었다.",
+ 3: "사람은 ○○를 보고 짐작했고, AI는 △△를 세어서 판단했다.",
+ 4: "처음에는 ○○라고 생각했는데, △△를 읽고 □□로 고쳤다(또는 그대로 두었다)."
+};
+// 사람이 정한 것 (지침 2.6)
+const HUMAN_DECISIONS = ["볼 자료(책 제목·우리 반 낱말)를 고른 것", "알아볼 낱말을 정한 것", "양옆 몇 칸까지 셀지(윈도우) 정한 것", "같은 말로 셀 말(세는 규칙)을 정한 것", "책 제목을 몇 번 읽은 것으로 칠지(무게) 정한 것"];
+const STORAGE_KEY = "word2vec_app2_v8";
+const activeTimers = {};
+const timerIntervals = {};
+const revealedQuestions = new Set();
+function makeEmptyCounts() { return Object.fromEntries(WORDS.map(word => [word, 0])); }
+function computeAutoCounts(targetWord, windowSize) {
+ const counts = makeEmptyCounts();
+ if (!targetWord) return counts;
+ BOOKS_TOKENIZED.forEach(tokens => {
+  tokens.forEach((token, idx) => {
+   if (token === targetWord) {
+    const start = Math.max(0, idx - windowSize);
+    const end = Math.min(tokens.length - 1, idx + windowSize);
+    for (let i = start; i <= end; i++) {
+     if (i !== idx && WORDS.includes(tokens[i])) counts[tokens[i]] += 1;
+    }
+   }
+  });
+ });
+ return counts;
+}
+function defaultState() {
+ return {
+  currentStage: 0,
+  story: { found: [], same: "", why: "" },
+  s1: { clues: [], sub: 0, win: 0, seen: {} },
+  my: {},             // 2단계: 목표 낱말 → { 옆 말: 횟수 }
+  s2: { checked: false },
+  s3: { col: "", view: "" },
+  f2: {},             // 2단계 문장 틀: 낱말 → { me, ai }
+  s4: { sub: 0, endAt: 0, timeUp: false, first: "", check: "", final: "", clue: "" },
+  frames: {},
+  cardSeen: {},
+  classSentences: [],
+  helpful: null,
+  myAdds: {},         // 4단계: 이 태블릿에서 낱말마다 넣은 수
+  studentAnswers: {},
+  humanPicks: [],
+  school: "",
+  studentNo: ""
+ };
+}
+function loadState() {
+ try {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return defaultState();
+  const saved = JSON.parse(raw);
+  const d = defaultState();
+  const s = { ...d, ...saved };
+  ["story", "s1", "s2", "s3", "s4"].forEach(k => { s[k] = { ...d[k], ...(saved[k] || {}) }; });
+  if (![0, 1, 2, 3, 4, 5].includes(s.currentStage)) s.currentStage = 0;
+  if (!Array.isArray(s.classSentences)) s.classSentences = [];
+  if (!Array.isArray(s.humanPicks)) s.humanPicks = [];
+  return s;
+ } catch (e) {
+  return defaultState();
+ }
+}
+let state = loadState();
+function saveState() {
+ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function keepScrollRender() { const y = window.scrollY; render(); window.scrollTo({ top: y }); }
+function windowIdx(tokens, target, win) {
+ const set = new Set();
+ tokens.forEach((t, i) => {
+  if (t !== target) return;
+  for (let j = Math.max(0, i - win); j <= Math.min(tokens.length - 1, i + win); j++) if (j !== i) set.add(j);
+ });
+ return set;
+}
+function cosine(a, b) {
+ let d = 0, na = 0, nb = 0;
+ Object.keys(a).forEach(k => { na += a[k] * a[k]; if (b[k]) d += a[k] * b[k]; });
+ Object.keys(b).forEach(k => { nb += b[k] * b[k]; });
+ return na && nb ? d / Math.sqrt(na * nb) : 0;
+}
+function bookSim(a, b, win) { return cosine(computeAutoCounts(a, win), computeAutoCounts(b, win)); }
+function josa(word, withBatchim, without) {
+ const c = String(word).charCodeAt(String(word).length - 1);
+ if (c < 0xac00 || c > 0xd7a3) return without;
+ return (c - 0xac00) % 28 ? withBatchim : without;
+}
+/* ===== 공통 화면 조각 ===== */
+function headerHTML() {
+ return `<header><h1>주변 단어는 어떤 단서가 될까?</h1>
+  <div class="stage-nav">${TAB_NAMES.map((n, i) => `<button class="stage-tab ${state.currentStage === i ? "active" : ""}" onclick="switchStage(${i})">${n}</button>`).join("")}</div>
+ </header>`;
+}
+function toolsHTML() {
+ const again = state.cardSeen[cardKey()] ? `<button type="button" class="ai-again" onclick="showCardAgain()">🤖 안내 다시 보기</button>` : "";
+ return again ? `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">${again}</div>` : "";
+}
+function cardKey() {
+ const st = state.currentStage;
+ if (st === 1 && state.s1.sub === 1) return "1b";
+ if (st === 4 && state.s4.sub !== 1 && state.s4.timeUp && !state.cardSeen["4t"]) return "4t";
+ return st;
+}
+function aiCardHTML() {
+ const key = cardKey(), c = key === "4t" ? { ...STAGE_CARDS["4t"], say: `${wrapUpText()}<br><br>이제 다음 문장을 읽고 문맥에 따라 단어의 의미를 짐작해요.` } : STAGE_CARDS[key];
+ if (!c || state.cardSeen[key]) return "";
+ const body = c.say ? `<div>${c.say}</div>` : `${c.human ? `<div class="card-row"><b>🙋 사람</b><span>${c.human}</span></div>` : ""}${c.ai ? `<div class="card-row"><b>🤖 컴퓨터</b><span>${c.ai}</span></div>` : ""}`;
+ return `<div class="overlay"><div class="ai-card card-pop"><div class="face">🤖</div><div class="say">
+   ${c.name ? `<div class="card-name">${c.name}</div>` : ""}${body}${c.todo ? `<div class="card-todo">👉 ${c.todo}</div>` : ""}
+  </div><button type="button" onclick="closeCard()">알겠어요</button></div></div>`;
+}
+function frameHTML(k, title) {
+ return `<div class="frame-box"><div class="frame-title">✍️ ${title}</div><div class="frame-tpl">${FRAMES[k]}</div>
+  <textarea class="student-answer-input" id="frame-${k}" rows="2" data-frame="${k}" placeholder="문장 틀의 ○○, △△를 채워 써 보세요.">${esc(state.frames[k] || "")}</textarea></div>`;
+}
+function nextHTML(label, stage) {
+ return `<div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(${stage})">${label}</button></div>`;
+}
+function closeCard() {
+ const key = cardKey();
+ state.cardSeen[key] = true;
+ if (key === "4t") { state.s4.sub = 1; saveState(); render(); window.scrollTo({ top: 0 }); return; }
+ saveState(); keepScrollRender();
+}
+function showCardAgain() { state.cardSeen[cardKey()] = false; saveState(); keepScrollRender(); }
+// 이전 활동으로 돌아가기
+function goPrev() {
+ const st = state.currentStage;
+ if (st === 1 && state.s1.sub === 1) state.s1.sub = 0;
+ else if (st === 4 && state.s4.sub === 1) state.s4.sub = 0;
+ else if (st > 0) {
+  state.currentStage = st - 1;
+  if (st - 1 === 1 && appleReady()) state.s1.sub = 1;
+  if (st - 1 === 4) state.s4.sub = 1;
+ }
+ saveState(); render(); window.scrollTo({ top: 0 });
+}
+function switchStage(n) { state.currentStage = n; saveState(); render(); window.scrollTo({ top: 0, behavior: "auto" }); }
+/* ===== 📖 글 읽기 =====
+ ★ 선생님이 바꾸는 곳: 글 제목·문단. 《 》 안은 책 제목이에요. */
+const STORY = {
+ title: "새 도서관이 문을 연 날",
+ paragraphs: [
+  "우리 학교에 새 도서관이 문을 열었다. 나는 아침부터 가슴 설레는 마음으로 도서관 앞에 줄을 섰다. 선생님은 \"오늘은 마음을 나타내는 낱말이 들어간 책을 찾아보자.\"라고 하셨다.",
+  "도서관 한쪽 책장에는 '두근두근'이 들어간 책이 가득했다. 《두근두근 불안》, 《두근두근 걱정 대장》, 《무서운 생각 두근두근 떨림》을 읽으니 왠지 겁이 났다. 그런데 바로 아래 칸에는 《두근두근 처음 도서관》, 《두근두근 마음 뭘까》, 《두근두근 처음 만나요》가 있었다. 이번에는 이상하게 기분이 좋아졌다.",
+  "책을 고르고 있는데 낯선 친구가 다가와 말을 걸었다. \"안녕, 나 이번에 전학 왔어. 처음 만나요!\" 친구 손에도 《두근두근 처음 만나요》가 들려 있었다. 친구는 \"새 학교라서 걱정이 많았는데, 같은 책을 고른 친구를 만나서 다행이야.\"라고 말했다. 우리는 마주 보고 웃었다. 집에 오는 길 내내 내 가슴은 계속 두근거렸다. 불안해서가 아니라 설레서였다.",
+  "그날 밤, 나는 문득 궁금해졌다. 컴퓨터도 이 책 제목들만 읽고 낱말의 뜻을 짐작할 수 있을까?"
+ ],
+ // 4단계 '다음 문장을 읽고 단어의 의미 짐작하기': 앞 문장으로 짐작 → 다음 문장을 읽고 점검
+ check: {
+  s1: "집에 오는 길 내내 내 가슴은 계속 두근거렸다.",
+  s2: "불안해서가 아니라 설레서였다.",
+  options: { scary: "😨 불안해서", happy: "😊 설레서" },
+  answer: "happy",
+  clues: ["아니라", "설레서였다"]   // 두근거린 까닭을 알려 준 말 (정답)
+ }
+};
+const STORY_WORDS = { "걱정": "#0d9488", "불안": "#7c3aed", "처음": "#ea580c" };
+// '걱정이', '불안해서가'처럼 뒤에 말이 붙어도 그 낱말로 찾는다
+function storyWordOf(tok) {
+ const core = tok.replace(/[《》.,!?"'“”‘’…]/g, "");
+ return Object.keys(STORY_WORDS).find(w => core.startsWith(w)) || null;
+}
+function storyTokens() {
+ let n = 0;
+ return STORY.paragraphs.map(p => p.split(/\s+/).map(tok => ({ tok, id: n++, word: storyWordOf(tok) })));
+}
+const STORY_PAIRS = [["걱정", "불안"], ["불안", "처음"], ["걱정", "처음"]];
+function pairName(p) { return `${p[0]}·${p[1]}`; }
+function renderStory() {
+ const paras = storyTokens();
+ const all = paras.flat().filter(x => x.word);
+ const found = state.story.found || [];
+ const done = all.every(x => found.includes(x.id));
+ const st = state.story;
+ const text = paras.map(p => `<p>${p.map(x => {
+  const f = x.word && found.includes(x.id);
+  return `<span class="stok ${f ? "found" : ""}" ${f ? `style="--wc:${STORY_WORDS[x.word]}"` : ""} onclick="tapStory(${x.id}, this)">${esc(x.tok)}</span>`;
+ }).join(" ")}</p>`).join("");
+ const counts = Object.keys(STORY_WORDS).map(w => {
+  const total = all.filter(x => x.word === w).length, got = all.filter(x => x.word === w && found.includes(x.id)).length;
+  return `<span class="guess-pill" style="background:${STORY_WORDS[w]}">${w} ${got}/${total}</span>`;
+ }).join(" ");
+ const right = !done ? `<div class="panel"><div class="panel-title"><span>🔍 낱말 찾기</span></div>
+   <div class="q-line">${counts}</div></div>`
+  : `<div class="panel"><div class="panel-title"><span>🔍 낱말 찾기</span><span class="found-count">✅ 모두 찾았어요</span></div><div class="q-line">${counts}</div></div>
+  <div class="panel">
+   <div class="panel-title"><span>🙋 질문 1</span></div>
+   <div class="step-title">세 낱말 중 뜻이 가장 비슷한 두 낱말은?</div>
+   <div class="choice-row">${STORY_PAIRS.map(p => `<button type="button" class="big-btn light ${st.same === pairName(p) ? "on" : ""}" onclick="setStory('same','${pairName(p)}')">${pairName(p)}</button>`).join("")}</div>
+   ${st.same ? `<div class="step-title">왜 그렇게 생각했나요?</div>
+    <textarea class="why-input" id="story-why" rows="2" data-story="why" placeholder="왜 그렇게 생각했나요?">${esc(st.why || "")}</textarea>` : ""}
+  </div>
+  ${st.same ? `<div class="ai-say">🤖 저는 뜻을 몰라요. 옆에 나온 말만 세요.</div>` : ""}`;
+ return `${headerHTML()}
+  ${toolsHTML()}${aiCardHTML()}
+  <div class="story-layout">
+   <section class="panel story-box">
+    <div class="panel-title"><span>📖 ${esc(STORY.title)}</span></div>
+    <div class="story-text">${text}</div>
+   </section>
+   <div>${right}</div>
+  </div>
+  ${done && st.same ? nextHTML("1단계: 문맥 살피기 →", 1) : ""}`;
+}
+function tapStory(id, el) {
+ const x = storyTokens().flat().find(t => t.id === id);
+ if (!x || !x.word) { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); return; }
+ const f = state.story.found || [];
+ if (f.includes(id)) return;
+ state.story.found = [...f, id];
+ saveState(); keepScrollRender();
+}
+function setStory(k, v) { state.story[k] = v; saveState(); keepScrollRender(); }
+/* ===== 1단계: 문맥 살피기 ('사과' 두 문장 + 윈도우 1·2) ===== */
+function appleCore(tok) { return String(tok).replace(/[.,!?"'“”‘’…]/g, ""); }
+function appleToks(i) { return APPLE.sentences[i].text.split(/\s+/); }
+function appleWin(i, w) { return windowIdx(appleToks(i).map(appleCore), APPLE.word, w); }
+function appleClueWords(i) {
+ const toks = appleToks(i);
+ return state.s1.clues.filter(id => id.startsWith(`${i}:`)).map(id => appleCore(toks[Number(id.split(":")[1])]));
+}
+function appleReady() { return APPLE.sentences.every((_, i) => appleClueWords(i).length > 0); }
+function renderStage1() {
+ const s1 = state.s1, clues = new Set(s1.clues), sub = s1.sub === 1 ? 1 : 0, w = sub ? s1.win : 0;
+ const seenAll = APPLE.windows.every(n => s1.seen[n]);
+ const cards = APPLE.sentences.map((sen, i) => {
+  const toks = appleToks(i), win = w ? appleWin(i, w) : new Set();
+  const html = toks.map((tok, k) => {
+   if (appleCore(tok) === APPLE.word) return `<span class="tok is-target">${esc(tok)}</span>`;
+   const id = `${i}:${k}`, c = clues.has(id), iw = win.has(k);
+   return `<span class="tok ${c ? "is-clue" : ""} ${iw ? "in-win" : ""} ${w && c && !iw ? "out-win" : ""} ${sub ? "plain" : ""}" ${sub ? "" : `onclick="toggleAppleClue('${id}')"`}>${esc(tok)}</span>`;
+  }).join(" ");
+  return `<div class="read-card"><div class="read-text">${html}</div></div>`;
+ }).join("");
+ if (sub === 0) {
+  return `${headerHTML()}${toolsHTML()}${aiCardHTML()}
+   <section class="panel">
+    <div class="panel-title"><span>🍎 두 '${APPLE.word}'가 다른 뜻이라는 것을 알려 주는 말을 눌러요</span></div>
+    <div class="read-grid">${cards}</div>
+   </section>
+   ${appleReady() ? `<div class="bottom-area"><button type="button" class="next-btn" onclick="goAppleWindow()">다음 활동 →</button></div>` : ""}`;
+ }
+ let body = "";
+ if (w) {
+  const rows = APPLE.sentences.map((_, i) => { const toks = appleToks(i).map(appleCore); return [...appleWin(i, w)].map(k => toks[k]); });
+  const cols = [...new Set(rows.flat())];
+  const table = `<div class="table-wrap" style="margin-top:10px"><table class="rt"><thead><tr><th>'${APPLE.word}' 옆 말</th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
+   ${rows.map((r, i) => `<tr><td>문장 ${i + 1}</td>${cols.map(c => { const n = r.filter(x => x === c).length; const mine = appleClueWords(i).includes(c); return `<td class="${n ? (mine ? "shared" : "nz") : ""}">${n}${mine && n ? " ✔" : ""}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`;
+  const lines = APPLE.sentences.map((_, i) => {
+   const toks = appleToks(i).map(appleCore), win = appleWin(i, w);
+   const inside = appleClueWords(i).filter(c => [...win].some(k => toks[k] === c));
+   const outside = appleClueWords(i).filter(c => !inside.includes(c));
+   return `문장 ${i + 1}: ${inside.map(x => `'${esc(x)}' ✅`).join(" ")} ${outside.map(x => `'${esc(x)}' ❌`).join(" ")}`;
+  });
+  body = `${table}<div class="ai-say" style="margin-top:10px">🤖 내 단서가 윈도우 ${w}칸 안에 있나요? (✅ 안 · ❌ 밖)<br>${lines.join("<br>")}</div>`;
+ }
+ return `${headerHTML()}${toolsHTML()}${aiCardHTML()}
+  <section class="panel">
+   <div class="panel-title"><span>🪟 윈도우 1, 2를 모두 눌러 보세요</span></div>
+   <div class="window-buttons" style="margin-bottom:12px">${APPLE.windows.map(n => `<button type="button" class="window-btn ${w === n ? "active" : ""}" onclick="setAppleWin(${n})">${n}</button>`).join("")}</div>
+   <div class="read-grid">${cards}</div>
+   ${body}
+  </section>
+  ${seenAll ? frameHTML(1, "문장 틀을 채워요") + nextHTML("2단계: 문맥 단서 세기 →", 2) : ""}`;
+}
+function toggleAppleClue(id) {
+ const wasReady = appleReady();
+ const list = state.s1.clues;
+ state.s1.clues = list.includes(id) ? list.filter(x => x !== id) : [...list, id];
+ saveState(); keepScrollRender();
+ // 활동이 끝나면 설명 카드와 함께 다음 활동으로 넘어간다
+ if (!wasReady && appleReady()) setTimeout(() => {
+  if (state.currentStage !== 1 || state.s1.sub === 1 || !appleReady()) return;
+  state.s1.sub = 1; state.cardSeen["1b"] = false; saveState(); render(); window.scrollTo({ top: 0 });
+ }, 700);
+}
+function goAppleWindow() { state.s1.sub = 1; saveState(); render(); window.scrollTo({ top: 0 }); }
+function setAppleWin(n) { state.s1.win = n; state.s1.seen[n] = true; saveState(); keepScrollRender(); }
+/* ===== 2단계: 문맥 단서 세기 (책장 + 관계표 직접 세기) ===== */
+const T_COLORS = { "걱정": "#0d9488", "불안": "#7c3aed", "처음": "#ea580c" };
+const SPINE_COLORS = ["#fde68a", "#bfdbfe", "#fecaca", "#bbf7d0", "#ddd6fe", "#fed7aa"];
+const SPINE_MIN_H = [270, 240, 255, 250, 230, 260];
+function bookTarget(toks) { return TARGETS.find(t => toks.includes(t)) || null; }
+function shelfHTML() {
+ const spines = BOOKS_TOKENIZED.map((toks, b) => {
+  const t = bookTarget(toks);
+  const html = toks.map(tok => tok === t
+   ? `<span class="sp-tok sp-target" style="--tc:${T_COLORS[t]}">${esc(tok)}</span>`
+   : `<span class="sp-tok sp-plain">${esc(tok)}</span>`).join("");
+  return `<div class="spine" style="background:${SPINE_COLORS[b % SPINE_COLORS.length]};min-height:${SPINE_MIN_H[b % SPINE_MIN_H.length]}px">${html}</div>`;
+ }).join("");
+ return `<div class="shelf-wrap"><div class="shelf">${spines}</div><div class="shelf-board"></div></div>`;
+}
+function myRow(t) { if (!state.my[t]) state.my[t] = {}; return state.my[t]; }
+function rowCorrect(t) { const a = computeAutoCounts(t, S_WIN), m = myRow(t); return COLS.every(c => (m[c] || 0) === (a[c] || 0)); }
+function countsDone() { return state.s2.checked && TARGETS.every(rowCorrect); }
+function renderStage2() {
+ const chk = state.s2.checked, done = countsDone();
+ const rows = COUNT_ORDER.map(t => {
+  const a = computeAutoCounts(t, S_WIN), m = myRow(t);
+  return `<tr><td><span class="basket-name" style="background:${T_COLORS[t]}">${esc(t)}</span></td>${COLS.map(c => {
+   const v = m[c] || 0, bad = chk && v !== (a[c] || 0);
+   return `<td class="${v > 0 ? "nz" : ""} ${bad ? "bad" : ""}"><div class="cstep"><button type="button" onclick="stepCount('${t}','${c}',-1)">−</button><b>${v}</b><button type="button" onclick="stepCount('${t}','${c}',1)">+</button></div></td>`;
+  }).join("")}</tr>`;
+ }).join("");
+ const msg = !chk ? "" : done ? `<div class="msg ok">⭕ 정답!</div>` : `<div class="msg warn">❌ 빨간 칸을 다시 세어 보세요.</div>`;
+ return `${headerHTML()}${toolsHTML()}${aiCardHTML()}
+  <section class="panel">
+   <div class="panel-title"><span>📚 도서관 책장</span></div>
+   ${shelfHTML()}
+  </section>
+  <section class="panel">
+   <div class="panel-title"><span>🔢 관계표 (윈도우 ${S_WIN}칸)</span></div>
+   <div class="table-wrap"><table class="rt"><thead><tr><th>목표 낱말</th>${COLS.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
+   <div class="row-btns"><button type="button" class="big-btn" onclick="checkCounts()">✅ 정답 확인</button></div>
+   ${msg}
+  </section>
+  ${done ? frame2HTML() + nextHTML("3단계: 뜻 추론하기 →", 3) : ""}`;
+}
+const F2_WORDS = ["걱정", "처음", "불안"];
+function frame2HTML() {
+ const row = w => { const v = state.f2[w] || {}; return `<div class="f2-row">나에게 '${w}'${josa(w, "은", "는")}
+   <input class="blank" id="f2-${w}-me" data-f2="${w}|me" type="text" value="${esc(v.me || "")}">이고,
+   컴퓨터에게 '${w}'${josa(w, "은", "는")} <input class="blank" id="f2-${w}-ai" data-f2="${w}|ai" type="text" value="${esc(v.ai || "")}">이다.</div>`; };
+ return `<div class="frame-box"><div class="frame-title">✍️ 아래 낱말의 뜻을 나와 인공지능이 어떻게 이해했는지 써 봅시다</div>${F2_WORDS.map(row).join("")}</div>`;
+}
+function stepCount(t, c, d) { const m = myRow(t); m[c] = Math.max(0, (m[c] || 0) + d); saveState(); keepScrollRender(); }
+function checkCounts() { state.s2.checked = true; saveState(); keepScrollRender(); }
+/* ===== 3단계: 뜻 추론하기 (세 낱말에 모두 들어 있는 옆 말 → 컴퓨터의 판단) ===== */
+function commonCols() { return COLS.filter(c => TARGETS.every(t => computeAutoCounts(t, S_WIN)[c] > 0)); }
+function renderStage3() {
+ const s3 = state.s3, common = commonCols();
+ const ok1 = !!s3.col && common.includes(s3.col);
+ const ok2 = ok1 && s3.view === "same";
+ const head = COLS.map(c => `<th class="pickable ${s3.col === c ? (ok1 ? "picked" : "wrong") : ""}" onclick="setS3('col','${c}')">${esc(c)}</th>`).join("");
+ const body = COUNT_ORDER.map(t => `<tr><td><span class="basket-name" style="background:${T_COLORS[t]}">${esc(t)}</span></td>${COLS.map(c => {
+  const has = computeAutoCounts(t, S_WIN)[c] > 0;
+  return `<td class="${ok1 && c === s3.col ? "shared" : ""}" style="font-size:20px !important">${has ? "●" : ""}</td>`;
+ }).join("")}</tr>`).join("");
+ const views = [["same", "셋 다 비슷하다"], ["처음", "'처음'만 다르다"], ["걱정", "'걱정'만 다르다"], ["불안", "'불안'만 다르다"]];
+ return `${headerHTML()}${toolsHTML()}${aiCardHTML()}
+  <section class="panel">
+   <div class="panel-title"><span>① 세 낱말에 모두 들어 있는 말을 눌러요</span></div>
+   <div class="table-wrap"><table class="rt"><thead><tr><th>목표 낱말</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+   ${s3.col ? (ok1 ? `<div class="msg ok">⭕ 정답!</div>` : `<div class="msg warn">❌ 다시 골라 보세요.</div>`) : ""}
+  </section>
+  ${ok1 ? `<section class="panel">
+   <div class="panel-title"><span>② 🤖 컴퓨터는 세 낱말을 어떻게 볼까요?</span></div>
+   <div class="choice-row">${views.map(([k, label]) => `<button type="button" class="big-btn light ${s3.view === k ? "on" : ""}" onclick="setS3('view','${k}')">${label}</button>`).join("")}</div>
+   ${s3.view ? (ok2 ? `<div class="msg ok">⭕ 정답!</div>
+    <div class="ai-say" style="margin-top:12px">🤖 셋 다 주변에 ${common.map(c => `'${esc(c)}'`).join(", ")}${josa(common[common.length - 1] || "말", "이", "가")} 있어서 의미가 비슷하다고 생각해요.</div>` : `<div class="msg warn">❌ 다시 골라 보세요.</div>`) : ""}
+  </section>` : ""}
+  ${ok2 ? frameHTML(3, "문장 틀을 채워요") + nextHTML("4단계: 추론 점검·수정하기 →", 4) : ""}`;
+}
+function setS3(k, v) { state.s3[k] = v; saveState(); keepScrollRender(); }
+/* ===== 4단계: 우리 반 낱말로 컴퓨터의 생각 바꾸기 (처음·걱정·불안) =====
+ 학생은 목표 낱말이 들어간 짧은 말(띄어쓰기 3번까지)을 넣는다: 시험 걱정 · 걱정 많은 날 · 처음 간 학교
+ ★ 선생님이 바꾸는 곳
+ - MAX_PER_WORD : 한 사람이 낱말마다 넣을 수 있는 수 (태블릿마다 셈)
+ - BOOK_WEIGHT  : 컴퓨터가 먼저 읽은 책 제목을 몇 번 읽은 것으로 칠지
+  초등 짧은 말로 40개 반을 시뮬레이션한 결과(22명, 무게 8, 윈도우 1칸):
+  모두 3개씩 넣으면(198개) 불안·처음 82% → 약 22%, 걱정·불안 약 46%, 걱정·처음 약 19%
+  1~3개씩 섞여 들어오면 불안·처음 약 35%, 걱정·불안 약 49% */
+const MAX_PER_WORD = 3;
+const TIME_LIMIT_SEC = 240;   // 4단계 낱말 넣기 시간 (4분)
+const BOOK_WEIGHT = 8;
+const CLASS_WIN = 1;
+const MAX_SPACES = 3;          // 한 번에 넣는 말의 띄어쓰기 수
+// 셀 때 빼는 말 (화면에는 보이지 않음): 모든 낱말 옆에 자주 나와 뜻 구별에 도움이 안 되는 말
+const STOPWORDS = ["나", "너", "우리", "저", "내", "제", "너무", "정말", "진짜", "아주", "매우", "좀", "조금", "많이", "더", "잘", "다", "또", "그리고", "그래서", "그런데", "하지만", "그", "이", "그것", "것", "거", "때", "수", "했다", "했어요", "한다", "해요", "하는", "있다", "있어요", "있었다", "없다", "같다", "같아요", "됐다", "된다", "돼요", "되었다", "안", "못"];
+const PARTICLES = ["에서는", "에게서", "으로는", "에서", "에게", "까지", "부터", "으로", "처럼", "보다", "하고", "에는", "이랑", "은", "는", "을", "를", "에", "의", "와", "과", "도", "로", "가", "랑", "만", "이"];
+function normToken(tok) {
+ const t = String(tok).replace(/[.,!?~"'“”‘’()\[\]…·:;]/g, "");
+ if (!t) return "";
+ for (const w of TARGETS) if (t.startsWith(w)) return w;
+ for (const p of PARTICLES) {
+  if (t.length > p.length && t.endsWith(p)) {
+   if ((p === "와" || p === "과" || p === "이") && t.length - p.length < 2) continue;
+   return t.slice(0, -p.length);
+  }
+ }
+ return t;
+}
+function sentenceTokens(text) { return String(text || "").trim().split(/\s+/).map(normToken).filter(x => x && !STOPWORDS.includes(x)); }
+// classCounts[목표 낱말][옆에 나온 말] = 우리 반 낱말에서 함께 나온 횟수
+function classCounts() {
+ const out = {};
+ TARGETS.forEach(t => { out[t] = {}; });
+ (state.classSentences || []).forEach(sen => {
+  const toks = sentenceTokens(sen.text);
+  toks.forEach((t, i) => {
+   if (!TARGETS.includes(t)) return;
+   for (let j = Math.max(0, i - CLASS_WIN); j <= Math.min(toks.length - 1, i + CLASS_WIN); j++) {
+    if (j !== i) out[t][toks[j]] = (out[t][toks[j]] || 0) + 1;
+   }
+  });
+ });
+ return out;
+}
+function wordVector(t, cc) {
+ const v = {};
+ Object.entries(computeAutoCounts(t, S_WIN)).forEach(([k, n]) => { if (n) v[k] = n * BOOK_WEIGHT; });
+ Object.entries((cc || classCounts())[t] || {}).forEach(([k, n]) => { v[k] = (v[k] || 0) + n; });
+ return v;
+}
+const MAP_PAIRS = [["불안", "처음"], ["걱정", "불안"], ["걱정", "처음"]];
+function classSims() {
+ const cc = classCounts(), v = {};
+ TARGETS.forEach(t => { v[t] = wordVector(t, cc); });
+ const out = {};
+ MAP_PAIRS.forEach(([a, b]) => { out[`${a}·${b}`] = cosine(v[a], v[b]); });
+ return out;
+}
+function bookSims() { const out = {}; MAP_PAIRS.forEach(([a, b]) => { out[`${a}·${b}`] = bookSim(a, b, S_WIN); }); return out; }
+// 세 낱말을 삼각형으로 놓는다: 비슷할수록 가깝게 (각도 거리 → 삼각형이 늘 성립)
+function mapPositions(sim) {
+ const d = k => Math.acos(Math.max(-1, Math.min(1, sim[k])));
+ const dGB = d("걱정·불안"), dGC = d("걱정·처음"), dBC = d("불안·처음");
+ const G = { x: 0, y: 0 }, B = { x: dGB, y: 0 };
+ const cx = dGB ? (dGC * dGC - dBC * dBC + dGB * dGB) / (2 * dGB) : 0;
+ const C = { x: cx, y: -Math.sqrt(Math.max(0, dGC * dGC - cx * cx)) };
+ const mx = (G.x + B.x + C.x) / 3, my = (G.y + B.y + C.y) / 3;
+ const scale = 0.5 / (Math.PI / 2);   // 90°(전혀 다름)가 지도 너비의 50%
+ const pos = p => ({ x: 50 + (p.x - mx) * scale * 100, y: 55 + (p.y - my) * scale * 100 * 1.25 });
+ return { "걱정": pos(G), "불안": pos(B), "처음": pos(C) };
+}
+let classMsg = "", classMsgWarn = false, lastSims = null, prevPos = null;
+function aiThinkText(prev, now) {
+ const p = x => Math.round(x * 100), k = "불안·처음";
+ if (!classCount()) return "🤖 내 생각엔 '처음'도 '불안'·'걱정'과 아주 비슷해요.";
+ const change = p(prev[k]) !== p(now[k]) ? ` (불안·처음 ${p(prev[k])}% → ${p(now[k])}%)` : "";
+ if (now[k] > prev[k] + 0.001) return `🤖 음, '처음'을 조금 더 가깝게 셌어요${change}.`;
+ if (now[k] >= prev[k] - 0.001) return "🤖 제 생각이 바뀌지 않았어요.";
+ if (now[k] >= 0.6) return `🤖 음… '처음'이 조금 멀어졌어요${change}.`;
+ if (now[k] >= 0.4) return `🤖 '처음'이 점점 멀어지고 있어요${change}.`;
+ return `🤖 아! 생각을 바꿀게요${change}. '처음'은 걱정·불안과 옆 말이 달라요.`;
+}
+function classCount() { return (state.classSentences || []).length; }
+function myAdds(t) { return (state.myAdds || {})[t] || 0; }
+function renderClassPanel() {
+ const sim = classSims(), start = bookSims();
+ const pos = mapPositions(sim);
+ const list = state.classSentences || [];
+ const pct = x => Math.round(x * 100);
+ const rows = TARGETS.map(t => {
+  const n = myAdds(t), full = n >= MAX_PER_WORD, locked = full || state.s4.timeUp;
+  const input = `<input class="slot" id="slot-${t}" type="text" maxlength="20" autocomplete="off" ${locked ? "disabled" : ""} placeholder="'${t}'${josa(t, "이", "가")} 들어간 짧은 말">`;
+  const chip = `<span class="slot-word" style="background:${T_COLORS[t]}">${t}</span>`;
+  return `<div class="slot-row">${chip}${input}
+   ${full ? `<span class="slot-done">✅ 다 넣었어요</span>` : state.s4.timeUp ? `<span class="slot-done" style="color:#64748b">${n}/${MAX_PER_WORD}</span>` : `<button type="button" class="slot-btn" onclick="submitSlot('${t}')">넣기 ${n}/${MAX_PER_WORD}</button>`}</div>`;
+ }).join("");
+ return `
+  <section class="class-panel" id="classPanel">
+   <div class="class-head">
+    <div><h2>🧪 우리 반 낱말로 컴퓨터의 생각 바꾸기</h2></div>
+    <div class="class-total">우리 반 낱말: <b>${list.length}개</b>${HAS_SERVER ? ' <span class="live">● 공유 중</span>' : ""}</div>
+   </div>
+   ${timerHTML()}
+   <div class="tri-map" id="triMap">
+    ${TARGETS.map(t => `<span class="tri-chip" data-w="${t}" style="background:${T_COLORS[t]};left:${(prevPos || pos)[t].x}%;top:${(prevPos || pos)[t].y}%">${t}</span>`).join("")}
+   </div>
+   <div class="vote-chart" style="margin-top:12px">${MAP_PAIRS.map(([a, b]) => { const k = `${a}·${b}`; return `<div class="vbar-row"><span class="vbar-label">${k}</span><span class="vbar-track"><span class="vbar-fill" style="width:${pct(sim[k])}%;background:${k === "불안·처음" ? "#e11d48" : "#4f46e5"}"></span></span><span class="vbar-n">${pct(sim[k])}%</span></div>`; }).join("")}</div>
+   <div class="ai-think">${state.s4.timeUp ? wrapUpText() : aiThinkText(lastSims || start, sim)}</div>
+   <div class="class-form">
+    <div class="step-title">✏️ 낱말이 들어간 짧은 말을 넣어요</div>
+    ${rows}
+    <div id="classMsg" class="class-msg ${classMsgWarn ? "warn" : ""}" ${classMsg ? "" : 'style="display:none"'}>${classMsg}</div>
+   </div>
+  </section>`;
+}
+function timeLeft() { return Math.max(0, Math.ceil(((state.s4.endAt || 0) - Date.now()) / 1000)); }
+function fmtTime(sec) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; }
+function timerHTML() {
+ if (state.s4.timeUp) return `<div class="timer-box done">⏰ 시간이 끝났어요</div>`;
+ const left = timeLeft();
+ return `<div class="timer-box ${left <= 30 ? "warn" : ""}" id="s4timer">⏱️ ${fmtTime(left)}</div>`;
+}
+function wrapUpText() {
+ const sim = classSims();
+ return sim["불안·처음"] < sim["걱정·불안"]
+  ? "🤖 여러분이 넣은 말을 다시 세어 보니 '처음'은 옆 말이 달랐어요. 그래서 생각을 바꿨어요."
+  : "🤖 넣은 말이 아직 적어서 제 생각이 그대로예요.";
+}
+// 1초마다 시계를 바꾸고, 시간이 끝나면 입력을 잠그고 마무리 카드를 띄운다
+setInterval(() => {
+ if (state.currentStage !== 4 || state.s4.sub === 1 || state.s4.timeUp || !state.s4.endAt) return;
+ const left = timeLeft(), el = document.getElementById("s4timer");
+ if (left > 0) { if (el) { el.textContent = `⏱️ ${fmtTime(left)}`; el.classList.toggle("warn", left <= 30); } return; }
+ state.s4.timeUp = true; state.cardSeen["4t"] = false; saveState();
+ const y = window.scrollY; render(); window.scrollTo({ top: y });
+}, 1000);
+// 그린 뒤 칩을 새 자리로 옮겨 움직이는 모습을 보여 준다
+function animateMap() {
+ const map = document.getElementById("triMap");
+ if (!map) return;
+ const pos = mapPositions(classSims());
+ requestAnimationFrame(() => requestAnimationFrame(() => {
+  map.querySelectorAll(".tri-chip").forEach(el => { const p = pos[el.dataset.w]; el.style.left = `${p.x}%`; el.style.top = `${p.y}%`; });
+ }));
+ prevPos = pos;
+}
+function submitSlot(t) {
+ if (myAdds(t) >= MAX_PER_WORD) return;
+ const el = document.getElementById(`slot-${t}`);
+ const raw = (el && el.value || "").trim();
+ const text = raw.replace(/[.,!?~"'“”‘’()\[\]…·:;]/g, "").replace(/\s+/g, " ").trim();
+ if (!text) { classMsg = "짧은 말을 써요."; classMsgWarn = true; showClassMsg(); return; }
+ if (!/^[가-힣 ]+$/.test(text)) { classMsg = "한글로 써요."; classMsgWarn = true; showClassMsg(); return; }
+ if ((text.match(/ /g) || []).length > MAX_SPACES) { classMsg = `띄어쓰기는 ${MAX_SPACES}번까지만 돼요.`; classMsgWarn = true; showClassMsg(); return; }
+ if (!sentenceTokens(text).includes(t)) { classMsg = `'${t}'${josa(t, "을", "를")} 넣어서 써요.`; classMsgWarn = true; showClassMsg(); return; }
+ if (sentenceTokens(text).length < 2) { classMsg = "다른 낱말도 함께 써요."; classMsgWarn = true; showClassMsg(); return; }
+ const item = { id: `s${Date.now()}`, word: t, text };
+ lastSims = classSims();
+ if (el) el.value = "";
+ const done = list => { state.myAdds = { ...(state.myAdds || {}), [t]: myAdds(t) + 1 }; afterClassChange(list, `✅ '${item.text}'${josa(item.text, "을", "를")} 넣었어요.`); };
+ if (HAS_SERVER) {
+  google.script.run.withSuccessHandler(done)
+   .withFailureHandler(() => { classMsg = "저장하지 못했어요. 다시 눌러 주세요."; classMsgWarn = true; showClassMsg(); })
+   .addClassSentences([item]);
+ } else {
+  done([...(state.classSentences || []), item]);
+ }
+}
+function keepSlotValues(fn) {
+ const vals = {}; TARGETS.forEach(t => { const el = document.getElementById(`slot-${t}`); if (el) vals[t] = el.value; });
+ const active = document.activeElement, focusId = active && active.classList && active.classList.contains("slot") ? active.id : null;
+ fn();
+ TARGETS.forEach(t => { const el = document.getElementById(`slot-${t}`); if (el && vals[t] && !el.disabled) el.value = vals[t]; });
+ if (focusId) { const el = document.getElementById(focusId); if (el) el.focus(); }
+}
+function afterClassChange(list, msg, clearSlotOf) {
+ state.classSentences = list || [];
+ classMsg = msg || ""; classMsgWarn = false;
+ saveState();
+ const y = window.scrollY;
+ keepSlotValues(render);
+ window.scrollTo({ top: y });
+}
+function showClassMsg() {
+ const box = document.getElementById("classMsg");
+ if (!box) return;
+ box.innerHTML = classMsg;
+ box.style.display = classMsg ? "" : "none";
+ box.classList.toggle("warn", classMsgWarn);
+}
+// 구글 Apps Script로 열면 우리 반 낱말을 시트에 모아 함께 쓴다
+const HAS_SERVER = typeof google !== "undefined" && google.script && google.script.run;
+function serverLoad(manual) {
+ if (!HAS_SERVER) return;
+ google.script.run.withSuccessHandler(list => {
+  const before = JSON.stringify(state.classSentences || []);
+  if (JSON.stringify(list || []) === before && !manual) return;
+  lastSims = classSims();
+  state.classSentences = list || [];
+  saveState();
+  if (state.currentStage !== 4) return;
+  const y = window.scrollY;
+  keepSlotValues(render);
+  window.scrollTo({ top: y });
+ }).getClassSentences();
+}
+function miniMapHTML() {
+ const pos = mapPositions(classSims());
+ return `<div class="tri-map mini">${TARGETS.map(t => `<span class="tri-chip" style="background:${T_COLORS[t]};left:${pos[t].x}%;top:${pos[t].y}%">${t}</span>`).join("")}</div>
+  <div class="ai-think">${wrapUpText()}</div>`;
+}
+function renderStage4() {
+ const s4 = state.s4;
+ if (s4.sub !== 1) {
+  if (!s4.endAt) { s4.endAt = Date.now() + TIME_LIMIT_SEC * 1000; saveState(); }
+  return `${headerHTML()}${toolsHTML()}${aiCardHTML()}
+   <div class="bridge">🔁 3단계에서 컴퓨터는 셋이 다 비슷하다고 했어요. 우리 반 낱말로 다시 세어 봐요.</div>
+   ${renderClassPanel()}
+   ${s4.timeUp ? `<div class="bottom-area"><button type="button" class="next-btn" onclick="goSentence()">다음 활동 →</button></div>` : ""}`;
+ }
+ const ck = STORY.check, lbl = k => ck.options[k] || "";
+ const firstOk = s4.first === ck.answer;
+ const done = (s4.check === "yes" && firstOk) || (s4.check === "no" && !firstOk && s4.final === ck.answer);
+ let feedback = "";
+ if (s4.check === "yes") feedback = firstOk ? `<div class="msg ok">⭕ 정답!</div>` : `<div class="msg warn">❌ 다음 문장을 다시 읽어 보세요.</div>`;
+ else if (s4.check === "no") {
+  if (firstOk) feedback = `<div class="msg warn">❌ 다음 문장을 다시 읽어 보세요.</div>`;
+  else feedback = `<div class="step-title">다시 골라요</div>
+   <div class="choice-row">${Object.keys(ck.options).map(k => `<button type="button" class="big-btn light ${s4.final === k ? "on" : ""}" onclick="setS4('final','${k}')">${lbl(k)}</button>`).join("")}</div>
+   ${s4.final ? (s4.final === ck.answer ? `<div class="msg ok">⭕ 정답!</div>` : `<div class="msg warn">❌ 다시 골라 보세요.</div>`) : ""}`;
+ }
+ // 두근거린 까닭을 알려 준 말 누르기
+ let cluePart = "";
+ if (done) {
+  const toks = [ck.s1, ck.s2].map((sen, si) => sen.split(/\s+/).map((tok, k) => {
+   const id = `${si}:${k}`, picked = s4.clue === id;
+   const right = picked && ck.clues.includes(tok.replace(/[.,!?]/g, ""));
+   return `<span class="tok ${picked ? (right ? "is-clue" : "out-win") : ""}" onclick="setS4('clue','${id}')">${esc(tok)}</span>`;
+  }).join(" "));
+  const pickedTok = s4.clue ? [ck.s1, ck.s2][Number(s4.clue.split(":")[0])].split(/\s+/)[Number(s4.clue.split(":")[1])].replace(/[.,!?]/g, "") : "";
+  const clueOk = pickedTok && ck.clues.includes(pickedTok);
+  cluePart = `<section class="panel">
+    <div class="panel-title"><span>👆 두근거린 까닭을 알려 준 말을 눌러요</span></div>
+    <div class="read-card"><div class="read-text">${toks[0]}<br>${toks[1]}</div></div>
+    ${s4.clue ? (clueOk ? `<div class="msg ok">⭕ 정답!</div><div class="ai-say" style="margin-top:12px">🤖 저도 여러분도 새 문장을 읽고 짐작을 점검했어요.</div>` : `<div class="msg warn">❌ 다시 골라 보세요.</div>`) : ""}
+   </section>
+   ${clueOk ? nextHTML("💬 생각 나누기 →", 5) : ""}`;
+ }
+ return `${headerHTML()}${toolsHTML()}${aiCardHTML()}
+  <section class="panel">
+   <div class="panel-title"><span>🤖 우리 반 낱말로 다시 센 결과</span></div>
+   ${miniMapHTML()}
+  </section>
+  <section class="panel">
+   <div class="panel-title"><span>📖 다음 문장을 읽고 문맥에 따라 단어의 의미를 짐작해요</span></div>
+   <div class="check-card">
+    <div class="q">${esc(ck.s1)}</div>
+    <div class="step-title">왜 두근거렸을까?</div>
+    <div class="choice-row">${Object.keys(ck.options).map(k => `<button type="button" class="big-btn light ${s4.first === k ? "on" : ""}" ${s4.check ? "disabled" : ""} onclick="setS4('first','${k}')">${lbl(k)}</button>`).join("")}</div>
+    ${s4.first ? `<div class="q" style="border-top:1px dashed var(--border);padding-top:8px;margin-top:10px">${esc(ck.s2)}</div>
+     <div class="step-title">짐작했던 뜻이 맞나요?</div>
+     <div class="choice-row">
+      <button type="button" class="big-btn light ${s4.check === "yes" ? "on" : ""}" onclick="setS4('check','yes')">⭕ 맞아요</button>
+      <button type="button" class="big-btn light ${s4.check === "no" ? "on" : ""}" onclick="setS4('check','no')">❌ 아니에요</button>
+     </div>
+     ${feedback}` : ""}
+   </div>
+  </section>
+  ${cluePart}`;
+}
+function goSentence() { state.s4.sub = 1; state.cardSeen["4t"] = true; saveState(); render(); window.scrollTo({ top: 0 }); }
+function setS4(k, v) {
+ const s4 = state.s4;
+ s4[k] = v;
+ if (k === "check") s4.final = "";
+ saveState(); keepScrollRender();
+}
+/* ===== 생각 나누기 ===== */
+function startQuestionTimer(qId) {
+ if (revealedQuestions.has(qId) || activeTimers[qId]) return;
+ activeTimers[qId] = 60;
+ keepScrollRender();
+ timerIntervals[qId] = setInterval(() => {
+  if (activeTimers[qId] > 1) {
+   activeTimers[qId] -= 1;
+   // 글을 쓰는 중에도 커서가 튀지 않게 타이머 부분만 바꾼다
+   const box = document.querySelector(`[data-timer="${qId}"]`);
+   if (box) {
+    box.querySelector(".timer-left").textContent = `생각할 시간: ${activeTimers[qId]}초 남음`;
+    box.querySelector(".progress-bar-fill").style.width = `${((60 - activeTimers[qId]) / 60) * 100}%`;
+   }
+  } else {
+   clearInterval(timerIntervals[qId]);
+   delete timerIntervals[qId];
+   delete activeTimers[qId];
+   revealedQuestions.add(qId);
+   if (state.currentStage === 5) keepScrollRender();
+  }
+ }, 1000);
+}
+function toggleHuman(i) {
+ const list = state.humanPicks;
+ state.humanPicks = list.includes(i) ? list.filter(x => x !== i) : [...list, i];
+ saveState(); keepScrollRender();
+}
+/* ===== 기록 보내기 (지침 6.3: 처음 판단·근거·수정 여부를 시트에 저장) =====
+ 구글 Apps Script의 saveApp2Records(rows) 함수로 보냅니다. */
+let saveMsg = "";
+function buildRecords() {
+ const rows = [], base = { school: state.school, no: state.studentNo };
+ const st = state.story, s1 = state.s1, s3 = state.s3, s4 = state.s4, ck = STORY.check;
+ if (st.same) rows.push({ ...base, step: "글 읽기", item: "뜻이 가장 비슷한 짝", first: st.same, evidence: st.why || "", keep: "", final: "" });
+ APPLE.sentences.forEach((sen, i) => {
+  if (!appleClueWords(i).length) return;
+  rows.push({ ...base, step: "1단계 문맥 살피기", item: sen.text, first: "", evidence: appleClueWords(i).join(", "), keep: "", final: s1.win ? `윈도우 ${Object.keys(s1.seen).join("·")} 확인` : "" });
+ });
+ F2_WORDS.forEach(w => { const v = state.f2[w]; if (v && (v.me || v.ai)) rows.push({ ...base, step: "2단계 문장 틀", item: w, first: `나: ${v.me || ""}`, evidence: `컴퓨터: ${v.ai || ""}`, keep: "", final: "" }); });
+ if (state.s2.checked) rows.push({ ...base, step: "2단계 문맥 단서 세기", item: "관계표 직접 세기", first: COUNT_ORDER.map(t => `${t}:${COLS.map(c => myRow(t)[c] || 0).join("/")}`).join(" "), evidence: "", keep: "", final: countsDone() ? "모두 맞음" : "고치는 중" });
+ if (s3.col) rows.push({ ...base, step: "3단계 뜻 추론하기", item: "세 낱말에 모두 들어 있는 말 / 컴퓨터의 판단", first: s3.col, evidence: "", keep: "", final: s3.view === "same" ? "셋 다 비슷하다" : s3.view ? `'${s3.view}'만 다르다` : "" });
+ if (s4.first) rows.push({ ...base, step: "4단계 다음 문장 읽기", item: `${ck.s1} / ${ck.s2}`, first: ck.options[s4.first], evidence: s4.clue ? [ck.s1, ck.s2][Number(s4.clue.split(":")[0])].split(/\s+/)[Number(s4.clue.split(":")[1])] : "", keep: s4.check === "yes" ? "유지" : s4.check === "no" ? "수정" : "", final: ck.options[s4.check === "no" ? s4.final : s4.first] || "" });
+ const frames = [1, 3].map(k => `${k}단계: ${state.frames[k] || ""}`).join(" / ");
+ rows.forEach(r => { r.frames = frames; });
+ return rows;
+}
+function sendRecords() {
+ const rows = buildRecords();
+ if (!state.studentNo) { saveMsg = "⚠️ 학교명과 번호를 먼저 적어 주세요."; keepScrollRender(); return; }
+ if (!rows.length) { saveMsg = "⚠️ 아직 보낼 기록이 없어요."; keepScrollRender(); return; }
+ if (!HAS_SERVER) { saveMsg = `이 화면에서는 이 기기에만 저장돼요. (기록 ${rows.length}개)`; keepScrollRender(); return; }
+ saveMsg = "보내는 중…"; keepScrollRender();
+ google.script.run.withSuccessHandler(() => { saveMsg = `✅ 선생님께 보냈어요. (기록 ${rows.length}개)`; keepScrollRender(); })
+  .withFailureHandler(() => { saveMsg = "⚠️ 보내지 못했어요. 잠시 뒤 다시 눌러 주세요."; keepScrollRender(); })
+  .saveApp2Records(rows);
+}
+function renderStage5() {
+ const allOn = HUMAN_DECISIONS.every((_, i) => state.humanPicks.includes(i));
+ return `${headerHTML()}
+  <section class="panel">
+   <div class="panel-title"><span>👥 사람이 정한 것을 눌러요</span></div>
+   <div class="human-list">${HUMAN_DECISIONS.map((d, i) => `<span class="human-item ${state.humanPicks.includes(i) ? "on" : ""}" onclick="toggleHuman(${i})">${state.humanPicks.includes(i) ? "✅ " : ""}${d}</span>`).join("")}</div>
+   ${allOn ? `<div class="class-summary">모두 사람이 정했어요.</div>` : ""}
+  </section>
+  <section class="section">
+   <h2 style="font-size: 18px; margin: 0; font-weight: 800; color: #0f172a;">🤔 생각 나누기</h2>
+  </section>
+  <div class="questions-grid">
+   ${VALUE_QUESTIONS.map(q => {
+    const isRevealed = revealedQuestions.has(q.id);
+    const remainingTime = activeTimers[q.id];
+    const isRunning = remainingTime !== undefined;
+    const studentAns = (state.studentAnswers && state.studentAnswers[q.id]) || "";
+    return `
+     <div class="question-card ${isRunning ? "timer-active" : ""}">
+      <div class="question-header"><span class="q-badge">질문 ${q.id}</span><h3 class="q-text">${q.question}</h3></div>
+      <div class="student-answer-area">
+       <label class="student-answer-label" for="q-input-${q.id}">✍️ 나의 생각 적기:</label>
+       <textarea id="q-input-${q.id}" class="student-answer-input" rows="3" data-qid="${q.id}" placeholder="여기에 생각한 내용을 적어보세요...">${esc(studentAns)}</textarea>
+      </div>
+      <div class="q-action-area">
+       ${!isRevealed ? (!isRunning
+        ? `<button type="button" class="timer-btn" onclick="startQuestionTimer(${q.id})">⏱️ 1분 생각하기 (생각 시간 갖기)</button>`
+        : `<div class="timer-running-box" data-timer="${q.id}"><span class="clock-icon">⏳</span><span class="timer-left">생각할 시간: ${remainingTime}초 남음</span>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${((60 - remainingTime) / 60) * 100}%;"></div></div></div>`)
+        : `<div class="answer-box"><div class="answer-title">💡 생각해볼 점 (예시 답변)</div><div>${q.answer}</div></div>`}
+      </div>
+     </div>`;
+   }).join("")}
+  </div>
+  <section class="panel" style="margin-top:16px">
+   <div class="panel-title"><span>📮 내 기록 선생님께 보내기</span></div>
+   <div class="start-form" style="margin-bottom:10px">
+    <label>학교명<input class="num-input" id="rec-school" data-rec="school" type="text" value="${esc(state.school)}" placeholder="소일초"></label>
+    <label>번호<input class="num-input" id="rec-no" data-rec="studentNo" type="text" inputmode="numeric" value="${esc(state.studentNo)}" placeholder="260601"></label>
+   </div>
+   <button type="button" class="big-btn" onclick="sendRecords()">📮 보내기</button>
+   ${saveMsg ? `<div class="msg" style="margin-top:10px">${saveMsg}</div>` : ""}
+  </section>
+  ${nextHTML("처음 활동으로 돌아가기 🔄", 0)}`;
+}
+/* ===== 그리기 ===== */
+function render() {
+ const app = document.getElementById("app");
+ // 다시 그려도 쓰던 칸과 커서 위치를 지킨다
+ const active = document.activeElement;
+ const keepId = active && active.id && (active.tagName === "TEXTAREA" || (active.tagName === "INPUT" && active.dataset && (active.dataset.rec || active.dataset.f2))) ? active.id : null;
+ const selStart = keepId ? active.selectionStart : 0;
+ const selEnd = keepId ? active.selectionEnd : 0;
+ const st = state.currentStage;
+ app.innerHTML = st === 0 ? renderStory() : st === 1 ? renderStage1() : st === 2 ? renderStage2() : st === 3 ? renderStage3() : st === 4 ? renderStage4() : renderStage5();
+ if (keepId) {
+  const el = document.getElementById(keepId);
+  if (el) { el.focus(); try { el.setSelectionRange(selStart, selEnd); } catch (e) {} }
+ }
+ if (st === 4) animateMap();
+ if (st > 0) {
+  const bars = app.querySelectorAll(".bottom-area");
+  let bar = bars[bars.length - 1];
+  if (!bar) { bar = document.createElement("div"); bar.className = "bottom-area"; app.appendChild(bar); }
+  bar.insertAdjacentHTML("afterbegin", `<button type="button" class="prev-btn" onclick="goPrev()">← 이전 활동</button>`);
+ }
+}
+document.addEventListener("input", e => {
+ const el = e.target;
+ if (!el || !el.dataset) return;
+ if (el.dataset.frame) { state.frames[el.dataset.frame] = el.value; saveState(); }
+ else if (el.dataset.qid) { state.studentAnswers[el.dataset.qid] = el.value; saveState(); }
+ else if (el.dataset.story) { state.story[el.dataset.story] = el.value; saveState(); }
+ else if (el.dataset.s3) { state.s3[el.dataset.s3] = el.value; saveState(); }
+ else if (el.dataset.s4) { state.s4[el.dataset.s4] = el.value; saveState(); }
+ else if (el.dataset.rec) { state[el.dataset.rec] = el.value.trim(); saveState(); }
+ else if (el.dataset.f2) { const [w, k] = el.dataset.f2.split("|"); state.f2[w] = { ...(state.f2[w] || {}), [k]: el.value }; saveState(); }
+});
+// Initial boot
+render();
+if (HAS_SERVER) { serverLoad(false); setInterval(() => serverLoad(false), 15000); }
+</script>
+</body>
+</html>

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>앱 3 관리자 · 어구 관리</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --border: #d8dde6; --text: #1f2937; --muted: #64748b; --bg: #f6f8fb; --card: #fff;
+      --primary: #2563eb; --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+    }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif; color: var(--text); background: var(--bg); line-height: 1.55; font-size: 15px; }
+    .wrap { width: min(1400px, 100%); margin: 0 auto; padding: 16px; }
+    header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    h1 { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; }
+    h2 { margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #0f172a; }
+    .sub { color: var(--muted); margin: 2px 0 0; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .btn { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 15px; cursor: pointer; color: var(--text); }
+    .btn:hover { background: #f1f5f9; }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn.primary:hover { background: #1d4ed8; }
+    .btn.save { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .btn:disabled { opacity: .45; cursor: default; }
+    .btn.small { padding: 4px 10px; font-size: 14px; }
+    input[type=password], input[type=text], textarea { font: inherit; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; width: 100%; }
+    textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; }
+    .login { max-width: 420px; margin: 80px auto; text-align: center; }
+    .login input { margin: 12px 0; text-align: center; font-size: 17px; }
+    .err { color: var(--bad); font-weight: 700; min-height: 22px; }
+    .note { color: var(--muted); font-size: 14px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tab { padding: 8px 18px; border-radius: 999px; border: 2px solid var(--border); background: #fff; font-weight: 800; font-size: 16px; cursor: pointer; }
+    .tab.on { color: #fff; }
+    .tab .st { margin-left: 6px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+    @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+    table { width: 100%; border-collapse: collapse; }
+    td.note, th { white-space: nowrap; }
+    th, td { border-bottom: 1px solid #eef1f5; padding: 7px 6px; text-align: left; vertical-align: middle; }
+    th { font-size: 13px; color: var(--muted); font-weight: 800; background: #f8fafc; position: sticky; top: 0; }
+    tr.use-수업 td { background: #eff6ff; }
+    tr.use-점검 td { background: #fef3c7; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+    .seg button { white-space: nowrap; border: 0; background: #fff; padding: 5px 9px; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--muted); }
+    .seg button + button { border-left: 1px solid var(--border); }
+    .seg button.on.u-창고 { background: #64748b; color: #fff; }
+    .seg button.on.u-수업 { background: var(--primary); color: #fff; }
+    .seg button.on.u-점검 { background: var(--warn); color: #fff; }
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; color: #fff; font-weight: 800; font-size: 13px; white-space: nowrap; }
+    td.phr { min-width: 230px; }
+    .phr input { border: 1px solid transparent; background: transparent; padding: 4px 6px; font-size: 15px; }
+    .phr input:hover, .phr input:focus { border-color: var(--border); background: #fff; }
+    .phr .orig { font-size: 12px; color: var(--muted); padding-left: 6px; }
+    .phr b.t { background: #fef08a; padding: 0 3px; border-radius: 4px; }
+    .flag { font-size: 13px; font-weight: 700; }
+    .flag.bad { color: var(--bad); } .flag.warn { color: var(--warn); } .flag.ok { color: var(--ok); } .flag.mute { color: var(--muted); }
+    .effect { font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .del { border: 0; background: none; cursor: pointer; font-size: 16px; opacity: .5; }
+    .del:hover { opacity: 1; }
+    .status { border-radius: 12px; padding: 12px 14px; font-weight: 700; margin-bottom: 12px; }
+    .status.ok { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
+    .status.warn { background: #fef3c7; color: #78350f; border: 1px solid #fcd34d; }
+    .status ul { margin: 6px 0 0; padding-left: 20px; font-weight: 600; }
+    .group { border: 2px solid; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
+    .group h4 { margin: 0 0 6px; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .group ul { margin: 0; padding-left: 18px; }
+    .group li { margin: 2px 0; }
+    .bridge { background: #fee2e2; border-radius: 8px; padding: 6px 9px; margin-top: 6px; font-size: 14px; color: #7f1d1d; }
+    .ctxw { background: #dbeafe; border-radius: 5px; padding: 0 4px; margin-right: 3px; font-size: 13px; }
+    .judge { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+    .paste-sum { margin-top: 8px; font-weight: 700; }
+    .savebar { position: sticky; bottom: 0; background: rgba(246,248,251,.95); padding: 10px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); }
+    .dirty { color: var(--warn); font-weight: 800; }
+    .lgrid { border-collapse: collapse; margin: 4px 0; }
+    .lgrid th, .lgrid td { border: 1px solid #e2e8f0; padding: 4px 8px; font-size: 14px; position: static; background: #fff; }
+    .lgrid input { width: 64px; padding: 4px 6px; font-size: 15px; }
+    .notice { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: #fef3c7; border: 2px solid #f59e0b; color: #78350f; font-weight: 800; padding: 10px 18px; border-radius: 12px; z-index: 50; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+    .filter { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+    .filter .btn.on { background: #0f172a; color: #fff; border-color: #0f172a; }
+    details summary { cursor: pointer; font-weight: 800; }
+    .help li { margin: 3px 0; }
+  </style>
+  <!-- 깃허브 배포: 시트 연결 설정과 연결 파일 -->
+  <script src="../config.js"></script>
+  <script src="../gas-bridge.js"></script>
+</head>
+<body>
+  <div class="wrap" id="app"></div>
+
+  <script>
+    /* =====================================================================
+       앱 3 관리자 페이지
+       - 학생 앱 주소 끝에 ?page=admin 을 붙여 엽니다.
+       - 어구는 구글 시트 '앱3 어구' 탭에 저장되고, 학생 앱이 거기서 불러옵니다.
+       - 쓰임: 창고(모아 두기만) · 수업(1~3단계에 나오는 어구) · 가르치기(4단계 '컴퓨터 가르치기' 문제, 낱말마다 2개 — 시트에는 '점검'으로 저장)
+       ※ 아래 뜻 이름과 세는 규칙은 학생 앱(index.html)과 같아야 합니다.
+       ===================================================================== */
+    const WINDOW = 2;
+    const TARGET_SUFFIX = ["한", "함", "하다", "해", "했다", "하게", "하고", "된", "을", "를", "이", "가", "은", "는", "의", "에", "로", "으로", "도", "만"];
+    const MEANINGS = {
+      "연패": ["계속 짐", "계속 이김(우승)"],
+      "반려": ["곁에서 함께 지내는 짝", "받지 않고 되돌려 보냄"],
+      "무료": ["돈을 내지 않음", "지루하고 심심함"],
+      "의사": ["병을 고치는 사람", "나라를 위해 목숨 바친 사람", "무엇을 하려는 생각"]
+    };
+    const TARGETS = Object.keys(MEANINGS);
+    const WORD_COLORS = { "연패": "#e11d48", "무료": "#2563eb", "반려": "#16a34a", "의사": "#9333ea" };
+    const MEANING_COLORS = ["#4f46e5", "#f59e0b", "#16a34a"];
+    const GROUP_COLORS = ["#7c3aed", "#0d9488", "#db2777", "#ea580c", "#0891b2", "#65a30d", "#be123c", "#4338ca"];
+    const SHORT = ["①", "②", "③"];
+    const MAX_LESSON = 12;   // 2단계에서 줄을 손으로 옮기기 좋은 최대 어구 수
+    const MAX_CHECK = 2, BASE_WEIGHT = 2, TEACH_MAX = 3;
+    const USES = ["창고", "수업", "점검"];
+    const USE_LABEL = { "창고": "창고", "수업": "수업", "점검": "가르치기" };
+
+    // 시트가 비어 있을 때 넣어 두는 선생님 예시 어구 (지금 학생 앱에 들어 있는 어구와 같음)
+    const EXAMPLES = {
+      "반려": { lesson: [["우리 집 반려 강아지 산책", 1], ["학교 신청서 반려 이유", 2], ["반려 강아지 사료 고르기", 1], ["보고서 반려 이유 설명", 2], ["반려 고양이 사료 걱정", 1], ["결재 서류 반려 통보", 2], ["새 반려 고양이 입양", 1], ["보고서 반려 통보 받음", 2]],
+        checks: [["강아지 사료 서류 반려", 2, "사료=4/0; 서류=0/2"], ["고양이 신청서 반려", 2, "고양이=4/0; 신청서=0/2"]] },
+      "무료": { lesson: [["주말 박물관 무료 입장", 1], ["할 일 없는 무료한 오후", 2], ["놀이공원 무료 입장 행사", 1], ["비 오는 날 무료한 오후", 2], ["음료 무료 쿠폰 행사", 1], ["방학 내내 무료한 오후", 2], ["배송비 무료 쿠폰", 1], ["심심하고 무료한 오후", 2]],
+        checks: [["행사 없는 무료한 하루", 2, "행사=4/0; 없는=0/2"], ["박물관 휴관 무료한 하루", 2, "박물관=2/0"]] },
+      "의사": { lesson: [["동네 병원 의사 진료", 1], ["안중근 의사 기념관", 2], ["반대 의사 표현", 3], ["치과 의사 진료", 1], ["윤봉길 의사 기념관 견학", 2], ["찬성 의사 표현", 3], ["소아과 의사 진료 시간", 1], ["독립운동가 안중근 의사 이야기", 2], ["참가 의사 표현 하기", 3]],
+        checks: [["기념관 반대 의사", 3, "기념관=0/4/0; 반대=0/0/2"], ["견학 거절 의사", 3, "견학=0/2/0"]] },
+      "연패": { lesson: [["축구부 연패 탈출 작전", 1], ["대회 3 연패 우승", 2], ["야구부 연패 탈출 성공", 1], ["올림픽 2 연패 금메달", 2], ["긴 연패 늪 탈출", 1], ["줄넘기 대회 2 연패 달성", 2], ["농구부 긴 연패 늪", 1], ["세계 대회 연패 금메달", 2]],
+        checks: [["올림픽 연패 충격", 1, "올림픽=0/2"], ["농구부 연패 축하", 2, "농구부=2/0"]] }
+    };
+    function exampleRows() {
+      const rows = [];
+      TARGETS.forEach(t => {
+        EXAMPLES[t].lesson.forEach(([text, c]) => rows.push(newRow({ cls: "예시", group: "", word: t, code: c, text, use: "수업" })));
+        EXAMPLES[t].checks.forEach(([text, c, learned]) => rows.push(newRow({ cls: "예시", group: "", word: t, code: c, text, use: "점검", learned })));
+      });
+      return rows;
+    }
+
+    const HAS_SERVER = typeof google !== "undefined" && google.script && google.script.run;
+    const LOCAL_KEY = "app3_admin_rows_v1";
+
+    let pw = "", appUrl = "", loggedIn = false, loginErr = "", firstTime = false, busy = false;
+    let rows = [], dirty = false, saveMsg = "";
+    let curWord = TARGETS[0], filter = "전체", pasteText = "", pastePreview = null;
+    let uid = 1;
+    function newRow(o) { return { learned: String(o.learned || ""), id: uid++, cls: String(o.cls || ""), group: String(o.group || ""), word: o.word, code: Number(o.code) || 0, text: String(o.text || "").trim(), orig: String(o.orig || ""), use: o.use || "창고" }; }
+
+    /* ===== 세는 규칙 (학생 앱과 같음) ===== */
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+    function tokensOf(text) { return String(text || "").trim().split(/\s+/).map(t => t.replace(/[.,!?~"'“”‘’()\[\]…·:;]/g, "")).filter(Boolean); }
+    function isTarget(tok, t) { return tok === t || (tok.startsWith(t) && TARGET_SUFFIX.includes(tok.slice(t.length))); }
+    function contextOf(text, t) {
+      const toks = tokensOf(text);
+      const tIdx = toks.map((x, i) => isTarget(x, t) ? i : -1).filter(i => i >= 0);
+      const ctx = [];
+      tIdx.forEach(i => { for (let j = Math.max(0, i - WINDOW); j <= Math.min(toks.length - 1, i + WINDOW); j++) if (!tIdx.includes(j)) ctx.push(toks[j]); });
+      return { toks, tIdx, ctx };
+    }
+    function shareWords(a, b) { return [...new Set(a.filter(w => b.includes(w)))]; }
+    function groupsOf(list, t) {
+      const C = list.map(r => contextOf(r.text, t).ctx), n = C.length, p = C.map((_, i) => i);
+      const f = x => p[x] === x ? x : (p[x] = f(p[x]));
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (shareWords(C[i], C[j]).length) p[f(i)] = f(j);
+      const map = {}, groups = [];
+      for (let i = 0; i < n; i++) { const r = f(i); if (map[r] == null) { map[r] = groups.length; groups.push([]); } groups[map[r]].push(i); }
+      return { C, groups };
+    }
+    function judge(list, t, text) {
+      const { C, groups } = groupsOf(list, t), ctx = contextOf(text, t).ctx;
+      const hits = groups.map(g => [...new Set(ctx.filter(x => g.some(i => C[i].includes(x))))]);
+      const scores = groups.map(g => ctx.reduce((a, x) => a + g.reduce((b, i) => b + C[i].filter(y => y === x).length, 0), 0));
+      const max = Math.max(0, ...scores), tops = scores.map((s, i) => s === max ? i : -1).filter(i => i >= 0);
+      if (!groups.length || max === 0) return { kind: "unknown", ctx };
+      if (tops.length > 1) return { kind: "tie", ctx, words: [...new Set(tops.flatMap(i => hits[i]))] };
+      const g = groups[tops[0]], cnt = {};
+      g.forEach(i => { cnt[list[i].code] = (cnt[list[i].code] || 0) + 1; });
+      const code = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+      return { kind: "pick", ctx, words: hits[tops[0]], code, mixed: Object.keys(cnt).length > 1 };
+    }
+
+    /* ===== 점검 표시 ===== */
+    const PARTICLE_HINT = ["께서", "에게", "에서", "으로", "에는", "에도", "까지", "부터", "을", "를", "께", "가"];
+    function particleHint(tok) {
+      for (const p of PARTICLE_HINT) if (tok.endsWith(p) && tok.length >= p.length + (p.length === 1 ? 2 : 1)) return p;
+      return null;
+    }
+    function norm(s) { return tokensOf(s).join(" "); }
+    function flagsOf(r) {
+      const out = [];
+      if (!TARGETS.includes(r.word)) { out.push({ lv: "bad", msg: "낱말이 연패·반려·무료·의사가 아니에요" }); return out; }
+      if (!(r.code >= 1 && r.code <= MEANINGS[r.word].length)) out.push({ lv: "bad", msg: "뜻코드를 확인해 주세요" });
+      const c = contextOf(r.text, r.word);
+      if (!c.tIdx.length) {
+        const glued = c.toks.find(x => x.includes(r.word));
+        out.push({ lv: "bad", msg: glued ? `'${glued}'처럼 붙어 있어서 컴퓨터가 '${r.word}'을(를) 못 찾아요. 띄어 써 주세요.` : `어구에 '${r.word}'이(가) 없어요` });
+      } else if (!c.ctx.length) out.push({ lv: "bad", msg: "옆 말이 없어요" });
+      const hinted = c.toks.filter((x, i) => !c.tIdx.includes(i) && particleHint(x));
+      if (hinted.length) out.push({ lv: "warn", msg: `조사가 붙었는지 확인: ${hinted.map(x => `'${x}'`).join(", ")}`, fix: true });
+      const dup = rows.some(o => o.id !== r.id && o.word === r.word && norm(o.text) === norm(r.text));
+      if (dup) out.push({ lv: "mute", msg: "같은 어구가 또 있어요" });
+      return out;
+    }
+    function usable(r) { return !flagsOf(r).some(f => f.lv === "bad"); }
+
+    /* ===== 데이터 다루기 ===== */
+    function wordRows(t) { return rows.filter(r => r.word === t); }
+    function lessonRows(t) { return wordRows(t).filter(r => r.use === "수업" && usable(r)); }
+    function checkRows(t) { return wordRows(t).filter(r => r.use === "점검"); }
+    function setUse(id, use) {
+      const r = rows.find(x => x.id === id); if (!r) return;
+      if (use !== "창고" && !usable(r)) { notice("⚠️ 빨간 표시를 먼저 고쳐 주세요."); return; }
+      if (use === "점검" && r.use !== "점검" && checkRows(r.word).length >= MAX_CHECK) { notice(`⚠️ 가르치기 문제는 ${MAX_CHECK}개까지예요. 하나를 먼저 창고로 빼 주세요.`); return; }
+      r.use = use;
+      if (use === "점검" && !r.learned) r.learned = defaultLearned(r);
+      markDirty(); render();
+    }
+    function editText(id, v) {
+      const r = rows.find(x => x.id === id); if (!r) return;
+      if (!r.orig) r.orig = r.text;
+      r.text = v.replace(/\s+/g, " ").trim();
+      if (r.orig === r.text) r.orig = "";
+      markDirty(); render();
+    }
+    function stripParticles(id) {
+      const r = rows.find(x => x.id === id); if (!r) return;
+      const toks = tokensOf(r.text).map(x => { if (isTarget(x, r.word)) return x; const p = particleHint(x); return p ? x.slice(0, -p.length) : x; });
+      editText(id, toks.join(" "));
+    }
+    let pendingDel = null;
+    function delRow(id) { if (pendingDel !== id) { pendingDel = id; render(); return; } pendingDel = null; rows = rows.filter(r => r.id !== id); markDirty(); saveMsg = "어구를 지웠어요. 저장해야 시트에서도 지워져요."; render(); }
+    let noticeMsg = "";
+    function notice(m) { noticeMsg = m; render(); setTimeout(() => { if (noticeMsg === m) { noticeMsg = ""; render(); } }, 3500); }
+    function markDirty() { dirty = true; saveMsg = ""; }
+
+    /* ===== 붙여넣기 ===== */
+    function parsePaste(text) {
+      const lines = String(text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return { add: [], dup: 0, bad: [] };
+      const split = l => l.includes("\t") ? l.split("\t") : l.split(",");
+      let cols = null, start = 0;
+      const head = split(lines[0]).map(x => x.trim());
+      if (head.some(h => /어구|문장|단어|낱말|뜻/.test(h))) {
+        const find = re => head.findIndex(h => re.test(h));
+        cols = { cls: find(/^반$/), group: find(/모둠/), word: find(/단어|낱말/), code: find(/뜻/), text: find(/어구|문장/) };
+        start = 1;
+      }
+      const add = [], bad = [];
+      let dup = 0;
+      const seen = new Set(rows.map(r => r.word + "|" + norm(r.text)));
+      for (let k = start; k < lines.length; k++) {
+        const c = split(lines[k]).map(x => x.trim());
+        let o;
+        if (cols) o = { cls: c[cols.cls] || "", group: c[cols.group] || "", word: c[cols.word] || "", code: c[cols.code] || "", text: c[cols.text] || "" };
+        else if (c.length >= 5) o = { cls: c[0], group: c[1], word: c[2], code: c[3], text: c.slice(4).join(" ") };
+        else if (c.length === 3) o = { cls: "", group: "", word: c[0], code: c[1], text: c[2] };
+        else { bad.push(lines[k]); continue; }
+        const codeStr = String(o.code).replace(/\s/g, "");
+        if (!o.word) o.word = TARGETS.find(t => codeStr.startsWith(t)) || "";
+        const num = Number((codeStr.match(/(\d+)\s*$/) || [])[1]);
+        if (!TARGETS.includes(o.word) || !num || !o.text) { bad.push(lines[k]); continue; }
+        const key = o.word + "|" + norm(o.text);
+        if (seen.has(key)) { dup++; continue; }
+        seen.add(key);
+        add.push(newRow({ ...o, code: num, use: "창고" }));
+      }
+      return { add, dup, bad };
+    }
+    function previewPaste() { pasteText = (document.getElementById("paste") || {}).value || ""; pastePreview = parsePaste(pasteText); render(); }
+    function confirmPaste() {
+      if (!pastePreview || !pastePreview.add.length) return;
+      rows = rows.concat(pastePreview.add);
+      const first = pastePreview.add[0].word;
+      saveMsg = `창고에 어구 ${pastePreview.add.length}개를 넣었어요. 아직 저장 전이에요.`;
+      pastePreview = null; pasteText = ""; curWord = first; filter = "전체"; dirty = true; render();
+    }
+    function cancelPaste() { pastePreview = null; render(); }
+
+    /* ===== 서버 ===== */
+    function call(fn, args, ok, fail) {
+      if (!HAS_SERVER) return local(fn, args, ok);
+      let r = google.script.run.withSuccessHandler(ok).withFailureHandler(e => { busy = false; (fail || (er => { saveMsg = "⚠️ " + (er && er.message || er); }))(e); render(); });
+      r[fn].apply(r, args);
+    }
+    // 시트 없이 이 파일만 열었을 때: 이 기기에만 저장
+    function local(fn, args, ok) {
+      setTimeout(() => {
+        if (fn === "adminLogin") ok({ ok: true, first: false });
+        if (fn === "adminLoadRows") { try { ok(JSON.parse(localStorage.getItem(LOCAL_KEY) || "null")); } catch (e) { ok(null); } }
+        if (fn === "adminSaveRows") { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(args[1])); } catch (e) {} ok(args[1].length); }
+      }, 50);
+    }
+    function login() {
+      const v = (document.getElementById("pw") || {}).value || "";
+      if (!v.trim()) { loginErr = "비밀번호를 적어 주세요."; render(); return; }
+      busy = true; render();
+      call("adminLogin", [v], res => {
+        busy = false;
+        if (!res || !res.ok) { loginErr = res && res.msg ? res.msg : "비밀번호가 맞지 않아요."; render(); return; }
+        pw = v; appUrl = res.url || ""; loggedIn = true; firstTime = !!res.first; loginErr = ""; load();
+      });
+    }
+    function load() {
+      busy = true; render();
+      call("adminLoadRows", [pw], data => {
+        busy = false;
+        if (Array.isArray(data) && data.length) { rows = data.map(d => newRow({ ...d, use: USES.includes(d.use) ? d.use : "창고" })); dirty = false; saveMsg = ""; }
+        else { rows = exampleRows(); dirty = true; saveMsg = "시트가 비어 있어서 지금 학생 앱에 든 예시 어구를 넣어 두었어요. [저장]을 누르면 시트에 들어가요."; }
+        render();
+      });
+    }
+    function saveAll() {
+      busy = true; saveMsg = "저장하는 중…"; render();
+      const out = rows.map(r => ({ cls: r.cls, group: r.group, word: r.word, code: r.code, text: r.text, orig: r.orig, use: r.use, learned: r.use === "점검" ? r.learned : "" }));
+      call("adminSaveRows", [pw, out], n => { busy = false; dirty = false; saveMsg = `✅ 저장했어요 (어구 ${n}개). 학생 앱을 새로 열면 반영돼요.`; render(); });
+    }
+
+    /* ===== 낱말별 미리보기 ===== */
+    function codePill(t, code) {
+      const i = code - 1, name = MEANINGS[t] && MEANINGS[t][i];
+      return name ? `<span class="pill" style="background:${MEANING_COLORS[i]}">${SHORT[i]} ${esc(name)}</span>` : `<span class="pill" style="background:#94a3b8">뜻 ?</span>`;
+    }
+    function phraseHTML(t, text) {
+      const c = contextOf(text, t);
+      return c.toks.map((x, i) => c.tIdx.includes(i) ? `<b class="t">${esc(x)}</b>` : esc(x)).join(" ");
+    }
+    function analyze(t) {
+      const list = lessonRows(t), { C, groups } = groupsOf(list, t), nM = MEANINGS[t].length;
+      const info = groups.map(g => {
+        const codes = [...new Set(g.map(i => list[i].code))];
+        const bridges = [];
+        if (codes.length > 1) {
+          for (let a = 0; a < g.length; a++) for (let b = a + 1; b < g.length; b++) {
+            const i = g[a], j = g[b];
+            if (list[i].code === list[j].code) continue;
+            const w = shareWords(C[i], C[j]);
+            if (w.length) bridges.push({ w, a: list[i], b: list[j] });
+          }
+        }
+        return { g, codes, bridges };
+      });
+      const problems = [];
+      const usedCodes = new Set(list.map(r => r.code));
+      for (let k = 1; k <= nM; k++) if (!usedCodes.has(k)) problems.push(`${SHORT[k - 1]} '${MEANINGS[t][k - 1]}' 뜻의 수업 어구가 없어요.`);
+      if (list.length < 4) problems.push("수업 어구가 너무 적어요. 뜻마다 3~4개가 좋아요.");
+      if (list.length > MAX_LESSON) problems.push(`수업 어구가 ${list.length}개예요. 2단계에서 줄을 손으로 옮기려면 ${MAX_LESSON}개 이하가 좋아요.`);
+      if (info.some(x => x.codes.length > 1)) problems.push("여러 뜻이 섞인 덩어리가 있어요. 빨간 '다리 말'이 든 어구를 창고로 빼 보세요.");
+      if (groups.length > nM) problems.push(`덩어리가 ${groups.length}개로 쪼개졌어요(뜻은 ${nM}개). 같은 뜻 어구끼리 옆 말이 하나 이상 겹쳐야 이어져요.`);
+      if (!checkRows(t).length) problems.push("4단계 '컴퓨터 가르치기' 문제가 없어요. 컴퓨터가 틀리는 어구 1~2개를 '가르치기'로 골라 주세요.");
+      const ready = !problems.length && groups.length === nM;
+      return { list, C, groups, info, problems, ready };
+    }
+    // 창고 어구를 수업에 넣으면 어떻게 될까?
+    function effectOf(r, A) {
+      if (!usable(r)) return "";
+      const t = r.word, ctx = contextOf(r.text, t).ctx;
+      const touched = A.groups.map((g, gi) => ({ gi, w: [...new Set(ctx.filter(x => g.some(i => A.C[i].includes(x))))] })).filter(x => x.w.length);
+      if (!touched.length) return `<span class="effect" style="color:#64748b">➖ 혼자 떨어져요</span>`;
+      const codes = new Set(touched.flatMap(x => A.groups[x.gi].map(i => A.list[i].code)));
+      if (touched.length > 1 || [...codes].some(c => c !== r.code)) return `<span class="effect" style="color:#dc2626">⚠️ 다른 뜻과 이어져요 (${touched.flatMap(x => x.w).map(esc).join(", ")})</span>`;
+      return `<span class="effect" style="color:#16a34a">🔗 같은 뜻과 이어져요 (${touched[0].w.map(esc).join(", ")})</span>`;
+    }
+    function judgeLabel(t, A, text, code) {
+      const j = judge(A.list, t, text);
+      if (j.kind === "unknown") return `<span class="effect" style="color:#64748b">🤖 몰라요</span>`;
+      if (j.kind === "tie") return `<span class="effect" style="color:#d97706">🤖 헷갈려요 (${j.words.map(esc).join(", ")})</span>`;
+      return `<span class="effect" style="color:${j.code === code ? "#16a34a" : "#dc2626"}">🤖 ${SHORT[j.code - 1]}일 것 같아요 ${j.code === code ? "⭕" : "❌"}</span>`;
+    }
+
+    /* ===== 화면 ===== */
+    function renderLogin() {
+      return `<div class="card login">
+        <div style="font-size:42px">🔐</div>
+        <h1>앱 3 관리자</h1>
+        <p class="sub">같은 낱말, 옆 말로 뜻을 나눌 수 있을까? · 어구 관리</p>
+        <input type="password" id="pw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')login()">
+        <button class="btn primary" style="width:100%" onclick="login()" ${busy ? "disabled" : ""}>${busy ? "확인하는 중…" : "들어가기"}</button>
+        <div class="err" style="margin-top:8px">${esc(loginErr)}</div>
+        <p class="note">처음 들어올 때 적은 비밀번호가 이 페이지의 비밀번호가 돼요. (4자 이상)</p>
+      </div>`;
+    }
+    /* ----- 4단계 가르치기 문제: 가상의 컴퓨터가 학습한 결과 -----
+       learned = "옆 말=①횟수/②횟수(/③횟수); …"  (1~3단계 수업 어구와 따로 움직임) */
+    function parseLearned(t, str) {
+      const nM = MEANINGS[t].length, out = {};
+      String(str || "").split(/[;\n]/).forEach(part => { const [w, nums] = part.split("="); if (!w || !nums) return; const ns = nums.split("/").map(x => Math.max(0, Number(x) || 0)); out[w.trim()] = Array.from({ length: nM }, (_, i) => ns[i] || 0); });
+      return out;
+    }
+    function learnedStr(obj) { return Object.keys(obj).map(w => `${w}=${obj[w].join("/")}`).join("; "); }
+    function probWords(r) { return [...new Set(contextOf(r.text, r.word).ctx)]; }
+    // 기본값: 지금 수업 어구에서 그 옆 말을 뜻별로 센 수 × 2 (없으면 0)
+    function defaultLearned(r) {
+      const t = r.word, nM = MEANINGS[t].length, obj = {};
+      probWords(r).forEach(w => { obj[w] = Array(nM).fill(0); });
+      lessonRows(t).forEach(x => { const c = contextOf(x.text, t).ctx; Object.keys(obj).forEach(w => { obj[w][x.code - 1] += BASE_WEIGHT * c.filter(y => y === w).length; }); });
+      return learnedStr(obj);
+    }
+    function learnedScore(r) {
+      const t = r.word, nM = MEANINGS[t].length, L = parseLearned(t, r.learned), sc = Array(nM).fill(0);
+      probWords(r).forEach(w => { (L[w] || []).forEach((n, i) => { sc[i] += n; }); });
+      const total = sc.reduce((a, b) => a + b, 0), max = Math.max(...sc), tops = sc.map((v, i) => v === max ? i : -1).filter(i => i >= 0);
+      return { sc, total, pct: sc.map(v => total ? Math.round(v / total * 100) : Math.round(100 / nM)), pick: total && tops.length === 1 ? tops[0] + 1 : 0 };
+    }
+    function learnedSummary(r) {
+      const t = r.word, s = learnedScore(r), bars = MEANINGS[t].map((m, i) => `${SHORT[i]} ${s.pct[i]}%`).join(" · ");
+      const head = s.pick ? `🤖 ${SHORT[s.pick - 1]}일 것 같아요 ${s.pick === r.code ? "⭕" : "❌"}` : (s.total ? "🤖 판단할 수 없음" : "🤖 몰라요");
+      return `<span class="effect" style="color:${s.pick && s.pick !== r.code ? "#dc2626" : "#64748b"}">${head}</span> <span class="note">(${bars})</span>`;
+    }
+    function setLearned(id, w, i, v) {
+      const r = rows.find(x => x.id === id); if (!r) return;
+      const obj = parseLearned(r.word, r.learned); probWords(r).forEach(x => { if (!obj[x]) obj[x] = Array(MEANINGS[r.word].length).fill(0); });
+      obj[w][i] = Math.max(0, Math.min(99, Math.round(Number(v) || 0)));
+      Object.keys(obj).forEach(x => { if (!probWords(r).includes(x)) delete obj[x]; });
+      r.learned = learnedStr(obj); markDirty(); render();
+    }
+    function resetLearned(id) { const r = rows.find(x => x.id === id); if (!r) return; r.learned = defaultLearned(r); markDirty(); render(); }
+    function teachNote(t, A, r) {
+      const s = learnedScore(r), L = parseLearned(t, r.learned), ws = probWords(r);
+      const others = Math.max(...s.sc.map((v, i) => i + 1 === r.code ? -1 : v)), need = Math.max(0, others - s.sc[r.code - 1] + 1);
+      let msg;
+      if (s.pick === r.code) msg = `<span class="flag warn">⚠️ 컴퓨터가 이미 맞혀요. 틀린 뜻 쪽 숫자를 더 크게 해 주세요.</span>`;
+      else if (need <= TEACH_MAX) msg = `<span class="flag ok">✅ 좋아요. 옆 말 하나 든 문장으로 ${need}번이면 판단이 바뀌어요.</span>`;
+      else if (need <= TEACH_MAX * 2) msg = `<span class="flag warn">⚠️ 조금 어려워요. 옆 말을 두 개씩 넣어야 3번 안에 바뀌어요.</span>`;
+      else msg = `<span class="flag bad">⛔ 너무 어려워요. 틀린 뜻 쪽 숫자를 줄여 주세요.</span>`;
+      const grid = `<table class="lgrid"><tr><th>옆 말</th>${MEANINGS[t].map((m, i) => `<th>${SHORT[i]} ${esc(m)}</th>`).join("")}</tr>
+        ${ws.map(w => `<tr><td><b>${esc(w)}</b></td>${MEANINGS[t].map((m, i) => `<td><input type="number" min="0" max="99" value="${(L[w] || [])[i] || 0}" onchange="setLearned(${r.id}, '${esc(w).replace(/'/g, "\\'")}', ${i}, this.value)"></td>`).join("")}</tr>`).join("")}</table>`;
+      return `${learnedSummary(r)}<div class="note" style="margin:6px 0 2px">가상의 컴퓨터가 학습한 횟수 (옆 말을 뜻별 문장에서 본 횟수)</div>${grid}
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px">${msg}<button class="btn small" onclick="resetLearned(${r.id})">수업 어구로 다시 채우기</button></div>`;
+    }
+    function tabStatus(t) { const A = analyze(t); return A.ready ? "✅" : "⚠️"; }
+    function renderMain() {
+      const t = curWord, A = analyze(t), cks = checkRows(t);
+      const all = wordRows(t);
+      const shown = all.filter(r => filter === "전체" || r.use === filter || (filter === "문제" && flagsOf(r).some(f => f.lv !== "mute")));
+      const order = { "수업": 0, "점검": 1, "창고": 2 };
+      shown.sort((a, b) => order[a.use] - order[b.use] || a.code - b.code);
+      const cnt = u => all.filter(r => r.use === u).length;
+      return `
+        <header>
+          <div><h1>🛠️ 앱 3 관리자 · 어구 관리</h1>
+            <p class="sub">중학생이 모은 어구를 창고에 넣고, 컴퓨터가 잘 나누는 어구를 골라 수업에 써요.</p></div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <a class="btn" href="${esc(startUrl())}" ${HAS_SERVER && !window.GAS_BRIDGE ? `target="_top"` : ""}>🏠 처음 화면으로</a>
+            <a class="btn" href="${esc(studentUrl())}" ${HAS_SERVER ? `target="_blank"` : ""}>👀 학생 앱 열기</a>
+          </div>
+        </header>
+        ${firstTime ? `<div class="status ok">🔐 비밀번호를 정했어요. 다음부터 이 비밀번호로 들어와요.</div>` : ""}
+
+        <details class="card help"><summary>❓ 처음이라면 — 이렇게 써요</summary>
+          <ol>
+            <li><b>붙여넣기:</b> 엑셀·구글 시트에서 <b>반·모둠·단어·뜻코드·어구</b> 칸을 머리글째 복사해 아래 칸에 붙여넣어요. 새 어구는 모두 <b>창고</b>에 들어가요.</li>
+            <li><b>고르기:</b> 낱말 탭에서 어구마다 <b>수업</b>(1~3단계에 나옴) 또는 <b>가르치기</b>(4단계 '컴퓨터 가르치기' 문제, 2개까지)를 눌러요. 가르치기 문제는 <b>컴퓨터가 뜻을 틀리게 고르는 어구</b>가 좋아요. 오른쪽에서 컴퓨터가 어떻게 나누는지 바로 보여요.</li>
+            <li><b>맞추기:</b> 오른쪽이 <b>✅</b>가 될 때까지 어구를 넣고 빼요. 창고 어구 옆의 <b>🔗 / ⚠️ / ➖</b>는 그 어구를 수업에 넣으면 어떻게 되는지 알려 줘요.</li>
+            <li><b>저장:</b> 아래 <b>[💾 저장]</b>을 눌러야 학생 앱에 반영돼요. ✅가 아닌 낱말은 학생 앱이 원래 예시 어구를 써요.</li>
+          </ol>
+          <p class="note">어구를 고치려면 글자를 눌러 바로 고쳐요(원래 어구는 회색으로 남아요). 컴퓨터가 틀리는 어구도 지우지 말고 창고에 두면, 4단계 점검 어구나 6차시 '틀린 까닭 찾기' 자료로 쓸 수 있어요.</p>
+        </details>
+
+        <div class="card">
+          <h2>📥 어구 붙여넣기</h2>
+          <textarea id="paste" placeholder="반	모둠	단어	뜻코드	어구&#10;102	6	연패	연패1	3년 연패 탈출">${esc(pasteText)}</textarea>
+          <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
+            <button class="btn primary" onclick="previewPaste()">표로 읽기</button>
+            ${pastePreview ? `<button class="btn save" onclick="confirmPaste()" ${pastePreview.add.length ? "" : "disabled"}>창고에 넣기 (${pastePreview.add.length}개)</button><button class="btn" onclick="cancelPaste()">취소</button>` : ""}
+          </div>
+          ${pastePreview ? `<div class="paste-sum">새 어구 ${pastePreview.add.length}개 ${TARGETS.map(w => { const n = pastePreview.add.filter(r => r.word === w).length; return n ? `· ${w} ${n}` : ""; }).join(" ")}
+              ${pastePreview.dup ? ` · 이미 있어서 뺀 것 ${pastePreview.dup}개` : ""}
+              ${pastePreview.bad.length ? `<div class="flag bad">읽지 못한 줄 ${pastePreview.bad.length}개: ${pastePreview.bad.slice(0, 3).map(esc).join(" / ")}${pastePreview.bad.length > 3 ? " …" : ""}</div>` : ""}</div>` : ""}
+        </div>
+
+        <div class="tabs">${TARGETS.map(w => `<button class="tab ${w === t ? "on" : ""}" style="border-color:${WORD_COLORS[w]}; ${w === t ? `background:${WORD_COLORS[w]}` : `color:${WORD_COLORS[w]}`}" onclick="setWord('${w}')">${w}<span class="st">${tabStatus(w)}</span></button>`).join("")}</div>
+
+        <div class="grid">
+          <div class="card" style="padding:12px">
+            <div class="filter">
+              ${["전체", "수업", "점검", "창고", "문제"].map(f => `<button class="btn small ${filter === f ? "on" : ""}" onclick="setFilter('${f}')">${f === "문제" ? "⚠️ 확인할 것" : (USE_LABEL[f] || f)} ${f === "전체" ? all.length : f === "문제" ? all.filter(r => flagsOf(r).some(x => x.lv !== "mute")).length : cnt(f)}</button>`).join("")}
+            </div>
+            <div style="max-height:70vh; overflow:auto">
+            <table>
+              <thead><tr><th>쓰임</th><th>뜻</th><th>어구</th><th>반·모둠</th><th>수업에 넣으면 / 컴퓨터 판단</th><th></th></tr></thead>
+              <tbody>${shown.map(r => {
+                const fl = flagsOf(r);
+                return `<tr class="use-${r.use}">
+                  <td><span class="seg">${USES.map(u => `<button class="u-${u} ${r.use === u ? "on" : ""}" onclick="setUse(${r.id},'${u}')">${USE_LABEL[u]}</button>`).join("")}</span></td>
+                  <td>${codePill(t, r.code)}</td>
+                  <td class="phr"><input type="text" value="${esc(r.text)}" onchange="editText(${r.id}, this.value)">
+                    ${r.orig ? `<div class="orig">원래: ${esc(r.orig)}</div>` : ""}
+                    ${fl.map(f => `<div class="flag ${f.lv}">${f.lv === "bad" ? "⛔" : f.lv === "warn" ? "⚠️" : "ℹ️"} ${esc(f.msg)} ${f.fix ? `<button class="btn small" onclick="stripParticles(${r.id})">조사 떼기</button>` : ""}</div>`).join("")}</td>
+                  <td class="note">${esc(r.cls)}${r.group ? `·${esc(r.group)}` : ""}</td>
+                  <td>${r.use === "창고" ? effectOf(r, A) + "<br>" + (usable(r) ? judgeLabel(t, A, r.text, r.code) : "") : r.use === "점검" && usable(r) ? learnedSummary(r) : ""}</td>
+                  <td>${pendingDel === r.id ? `<button class="btn small" style="color:#dc2626;border-color:#fca5a5" onclick="delRow(${r.id})">지우기</button>` : `<button class="del" title="지우기" onclick="delRow(${r.id})">🗑️</button>`}</td>
+                </tr>`;
+              }).join("") || `<tr><td colspan="6" class="note">어구가 없어요.</td></tr>`}</tbody>
+            </table></div>
+          </div>
+
+          <div>
+            <div class="card">
+              <h2>🤖 컴퓨터는 수업 어구 ${A.list.length}개를 이렇게 나눠요</h2>
+              ${A.ready
+                ? `<div class="status ok">✅ 덩어리 ${A.groups.length}개, 뜻마다 하나씩 나뉘어요. 수업에 쓸 수 있어요.</div>`
+                : `<div class="status warn">⚠️ 아직 학생 앱에 쓰기 어려워요. (저장해도 이 낱말은 원래 예시 어구가 나와요)<ul>${A.problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`}
+              ${A.info.map((x, gi) => `
+                <div class="group" style="border-color:${GROUP_COLORS[gi % GROUP_COLORS.length]}">
+                  <h4><span class="pill" style="background:${GROUP_COLORS[gi % GROUP_COLORS.length]}">덩어리 ${gi + 1}</span> 어구 ${x.g.length}개 ${x.codes.length > 1 ? `<span class="flag bad">⛔ 뜻 ${x.codes.length}개가 섞였어요</span>` : codePill(t, x.codes[0])}</h4>
+                  <ul>${x.g.map(i => `<li>${phraseHTML(t, A.list[i].text)} ${x.codes.length > 1 ? codePill(t, A.list[i].code) : ""}</li>`).join("")}</ul>
+                  ${x.bridges.slice(0, 4).map(b => `<div class="bridge">🌉 다리 말 <b>${b.w.map(esc).join(", ")}</b>: “${esc(b.a.text)}” ${SHORT[b.a.code - 1]} ↔ “${esc(b.b.text)}” ${SHORT[b.b.code - 1]}</div>`).join("")}
+                </div>`).join("") || `<p class="note">수업 어구를 고르면 여기에 덩어리가 나와요.</p>`}
+            </div>
+            <div class="card">
+              <h2>🧑‍🏫 4단계 컴퓨터 가르치기 (문제 ${cks.length}/${MAX_CHECK})</h2>
+              ${cks.length ? cks.map(r => `<div class="judge"><div style="font-size:16px">🆕 ${phraseHTML(t, r.text)} ${codePill(t, r.code)}</div>${usable(r) ? teachNote(t, A, r) : `<span class="flag bad">⛔ 이 어구는 고쳐야 해요</span>`}</div>`).join("")
+                : `<p class="note">컴퓨터가 <b>뜻을 틀리게 고르는</b> 어구를 1~2개 '가르치기'로 골라 주세요. 표의 '컴퓨터 판단'에서 ❌인 어구가 좋아요.</p>`}
+              <p class="note" style="margin-top:8px">4단계는 1~3단계와 따로 움직여요. 학생 화면은 위 숫자(가상의 컴퓨터가 학습한 결과)에서 시작하고, 학생이 넣은 문장은 1번으로 더해져요. 틀린 뜻 쪽이 2~4 정도 높으면 3번 안에 바꿀 수 있어요.</p>
+            </div>
+          </div>
+        </div>
+
+        ${noticeMsg ? `<div class="notice">${esc(noticeMsg)}</div>` : ""}
+        <div class="savebar">
+          <button class="btn save" onclick="saveAll()" ${busy ? "disabled" : ""}>💾 저장</button>
+          ${dirty ? `<span class="dirty">● 저장하지 않은 변경이 있어요</span>` : ""}
+          <span>${esc(saveMsg)}</span>
+          ${HAS_SERVER ? "" : `<span class="note">(미리보기: 시트 대신 이 브라우저에 저장돼요. 비밀번호는 아무거나 넣어도 들어가요)</span>`}
+        </div>`;
+    }
+    // 학생 앱의 첫 화면(학교명·번호 입력)으로
+    function startUrl() { if (window.GAS_BRIDGE) return "app3.html?start=1"; if (!HAS_SERVER) return "app3.html#start"; return appUrl ? appUrl + (appUrl.includes("?") ? "&" : "?") + "start=1" : "?start=1"; }
+    function studentUrl() { if (window.GAS_BRIDGE || !HAS_SERVER) return "app3.html"; if (appUrl) return appUrl; try { const u = new URL(window.location.href); u.searchParams.delete("page"); return u.toString(); } catch (e) { return "?"; } }
+    function setWord(w) { curWord = w; filter = "전체"; render(); }
+    function setFilter(f) { filter = f; render(); }
+    function render() {
+      const y = window.scrollY;
+      document.getElementById("app").innerHTML = loggedIn ? (busy && !rows.length ? `<div class="card">불러오는 중…</div>` : renderMain()) : renderLogin();
+      window.scrollTo({ top: y });
+      if (!loggedIn) { const el = document.getElementById("pw"); if (el) el.focus(); }
+    }
+    window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+    render();
+  </script>
+</body>
+</html>

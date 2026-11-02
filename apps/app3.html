@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>같은 낱말, 옆 말로 뜻을 나눌 수 있을까?</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --border: #d8dde6;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --selected: #111827;
+      --selected-text: #ffffff;
+      --button-bg: #ffffff;
+      --button-hover: #f1f5f9;
+      --target-color: #fef08a;
+      --target-border: #eab308;
+      --context-color: #bfdbfe;
+      --context-border: #3b82f6;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.5;
+      user-select: none;
+    }
+
+    .app {
+      width: min(1600px, 100%);
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .stage-nav {
+      display: flex;
+      gap: 8px;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .stage-tab {
+      border: none;
+      background: transparent;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 7px;
+      cursor: pointer;
+      color: #64748b;
+      transition: all 0.2s ease;
+    }
+
+    .stage-tab.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .books-panel {
+      position: sticky;
+      top: 10px;
+      z-index: 50;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+
+    .books-panel h2 {
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      font-weight: normal;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .legend-box {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid;
+    }
+
+    .legend-box.target {
+      background: var(--target-color);
+      border-color: var(--target-border);
+    }
+
+    .legend-box.context {
+      background: var(--context-color);
+      border-color: var(--context-border);
+    }
+
+    .books-text {
+      font-size: 11px;
+      line-height: 1.4;
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 5px;
+      overflow: hidden;
+    }
+
+    .book-item {
+      padding: 4px 6px;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      word-break: keep-all;
+    }
+
+    .book-title {
+      font-weight: 800;
+      color: #475569;
+      font-size: 11px;
+      margin-bottom: 3px;
+      padding-bottom: 2px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .token-span {
+      display: inline-block;
+      padding: 1px 3px;
+      margin: 1px 0;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+
+    .token-span.is-target {
+      background: var(--target-color);
+      border: 1px solid var(--target-border);
+      font-weight: 700;
+    }
+
+    .token-span.is-context {
+      background: var(--context-color);
+      border: 1px solid var(--context-border);
+      font-weight: 700;
+    }
+
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+
+    .control-group {
+      min-width: 200px;
+    }
+
+    .label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .window-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    button, select {
+      font: inherit;
+    }
+
+    .window-btn,
+    .word-btn,
+    .action-btn {
+      border: 1px solid var(--border);
+      background: var(--button-bg);
+      color: var(--text);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .window-btn {
+      width: 42px;
+      height: 38px;
+      font-weight: 700;
+    }
+
+    .window-btn:hover,
+    .word-btn:hover:not(:disabled) {
+      background: var(--button-hover);
+    }
+
+    .window-btn.active {
+      background: var(--selected);
+      color: var(--selected-text);
+      border-color: var(--selected);
+    }
+
+    select {
+      width: 100%;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .action-btn {
+      height: 38px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .action-btn { white-space: nowrap; }
+
+    .action-btn.primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .action-btn.primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .word-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .word-btn {
+      min-height: 38px;
+      padding: 4px 10px;
+      font-weight: 600;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .word-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .word-btn.is-context-hint {
+      border-color: var(--context-border);
+      background: #eff6ff;
+    }
+
+    .count {
+      display: inline-block;
+      min-width: 20px;
+      margin-left: 6px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #111827;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .word-btn.is-context-hint .count {
+      background: var(--primary);
+      color: white;
+    }
+
+    .table-title {
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .table-wrap {
+      max-height: 420px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 1800px;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 6px;
+      text-align: center;
+      background: #fff;
+      min-width: 76px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    th:first-child,
+    td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      min-width: 100px;
+      font-weight: 700;
+      background: #f8fafc;
+      border-right: 2px solid var(--border);
+    }
+
+    th:first-child {
+      z-index: 30;
+      background: #e2e8f0;
+    }
+
+    td.highlight-cell {
+      background: #eff6ff;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    /* Target word row highlight (50% transparent fluorescent yellow) */
+    tr.highlighted-row td {
+      background-color: rgba(255, 255, 0, 0.5) !important;
+    }
+
+    .drawing-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .tool-group-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      margin-right: 4px;
+    }
+
+    .tool-btn {
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .tool-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .tool-btn.active {
+      background: var(--selected);
+      color: white;
+      border-color: var(--selected);
+    }
+
+    .color-picker-wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .color-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #cbd5e1;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .color-dot.active {
+      transform: scale(1.2);
+      border-color: #0f172a;
+    }
+
+    .stage2-workspace-container {
+      position: relative;
+      flex: 1;
+      min-height: 580px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawing-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 20;
+      pointer-events: none;
+      touch-action: none;
+    }
+
+    .drawing-canvas.canvas-active {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
+    .bottom-area {
+      display: flex;
+      justify-content: flex-end;
+      padding: 8px 0 16px;
+    }
+
+    .next-btn {
+      min-width: 140px;
+      min-height: 44px;
+      padding: 0 20px;
+      background: var(--selected);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .stage2-layout {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+      min-height: 680px;
+    }
+
+    .stage2-left {
+      flex: 1; /* Approx 1/3 */
+      min-width: 320px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .stage2-right {
+      flex: 2; /* Approx 2/3 */
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stage2-left-header {
+      margin-bottom: 12px;
+    }
+
+    .stage2-left-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+      color: #0f172a;
+    }
+
+    .stage2-left-header p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stage2-table-wrap {
+      flex: 1;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .stage2-right-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .stage2-right-header h2 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .stage2-right-header p {
+      margin: 2px 0 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Interactive Drag-and-Drop Workspace */
+    .chip-workspace {
+      flex: 1;
+      position: relative;
+      background: #f8fafc;
+      border: 2px dashed #cbd5e1;
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 580px;
+      touch-action: none;
+    }
+
+    .word-chip {
+      position: absolute;
+      padding: 8px 16px;
+      background: #ffffff;
+      border: 2px solid var(--primary);
+      color: #1e3a8a;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+      white-space: nowrap;
+      z-index: 30; /* Always above drawing canvas (z-index 20) so chips are always draggable */
+    }
+
+    .word-chip:hover {
+      box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .word-chip.animate {
+      transition: left 0.8s ease, top 0.8s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .word-chip.is-idle {
+      border-style: dashed;
+      border-color: #94a3b8;
+      color: #64748b;
+    }
+
+    .arrange-msg {
+      margin-bottom: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #faf5ff;
+      border: 1px solid #d8b4fe;
+      color: #3b0764;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.6;
+    }
+
+    .arrange-msg.warn {
+      background: #fff7ed;
+      border-color: #fdba74;
+      color: #9a3412;
+    }
+
+    .word-chip.is-dragging {
+      cursor: grabbing;
+      z-index: 100;
+      box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.3);
+      transform: scale(1.08);
+      background: #eff6ff;
+    }
+
+    .questions-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .question-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      transition: border-color 0.2s ease;
+    }
+
+    .question-card.timer-active {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+    }
+
+    .question-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .q-badge {
+      background: var(--primary);
+      color: white;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .q-text {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .q-action-area {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .timer-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .timer-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .timer-running-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #eff6ff;
+      border: 1px solid var(--context-border);
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: #1e40af;
+      font-weight: 700;
+    }
+
+    .clock-icon {
+      font-size: 20px;
+      animation: spin-pulse 2s infinite linear;
+    }
+
+    @keyframes spin-pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+
+    .progress-bar-bg {
+      flex: 1;
+      height: 8px;
+      background: #dbeafe;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 1s linear;
+    }
+
+    .answer-box {
+      margin-top: 12px;
+      padding: 16px;
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 10px;
+      color: #14532d;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .answer-title {
+      font-weight: 800;
+      font-size: 14px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #15803d;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .student-answer-area {
+      margin-top: 12px;
+    }
+
+    .student-answer-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    .student-answer-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      background-color: #f8fafc;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .student-answer-input:focus {
+      border-color: var(--primary);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    @media (max-width: 1024px) {
+      .stage2-layout {
+        flex-direction: column;
+      }
+      .stage2-left {
+        min-height: 350px;
+      }
+      .chip-workspace {
+        min-height: 500px;
+      }
+    }
+
+    .class-panel { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin: 16px 0; }
+    .class-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #eef2f7; padding-bottom: 12px; margin-bottom: 16px; }
+    .class-head h2 { margin: 8px 0 4px; font-size: 20px; font-weight: 800; color: #0f172a; }
+    .class-head p { margin: 0; color: #475569; font-size: 14px; }
+    .class-badge { display: inline-block; background: #fee2e2; color: #be123c; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+    .c-a { color: #4f46e5; } .c-b { color: #d97706; }
+    .class-total { font-size: 14px; color: #475569; white-space: nowrap; }
+    .class-total b { color: #4f46e5; }
+    .live { color: #16a34a; font-size: 12px; font-weight: 700; }
+    .sim-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+    .sim-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; font-weight: 700; font-size: 14px; }
+    .sim-top b { font-size: 17px; }
+    .sim-top b.hi { color: #e11d48; } .sim-top b.mid { color: #d97706; } .sim-top b.lo { color: #16a34a; }
+    .sim-bar { height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 10px 0 12px; }
+    .sim-fill { height: 100%; background: #f43f5e; border-radius: 999px; transition: width 0.8s ease; }
+    .sim-track { position: relative; height: 56px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
+    .sim-chip { position: absolute; top: 12px; padding: 4px 12px; border-radius: 10px; color: #fff; font-weight: 800; font-size: 14px; white-space: nowrap; transition: left 0.8s ease; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+    .sim-chip.a { background: #4f46e5; } .sim-chip.b { background: #f59e0b; }
+    .ai-think { margin-top: 12px; background: #faf5ff; border: 1px solid #e9d5ff; color: #3b0764; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; line-height: 1.6; }
+    .class-form label { display: block; font-weight: 800; font-size: 14px; margin: 12px 0 6px; color: #334155; }
+    .class-form input { width: 100%; min-height: 46px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 15px; }
+    .class-form input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+    .class-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .class-submit { flex: 1; min-height: 48px; border: none; border-radius: 12px; background: #4f46e5; color: #fff; font-weight: 800; font-size: 15px; cursor: pointer; font-family: inherit; }
+    .class-submit:hover { background: #4338ca; }
+    .class-refresh { width: 52px; border: 1px solid var(--border); border-radius: 12px; background: #f1f5f9; cursor: pointer; font-size: 18px; }
+    .class-msg { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f0fdf4; border: 1px solid #86efac; color: #166534; font-size: 14px; font-weight: 700; }
+    .class-msg.warn { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+    .rule-note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+    .class-table { margin-top: 16px; }
+    .class-table summary { cursor: pointer; font-weight: 800; font-size: 14px; min-height: 36px; }
+    .class-list { margin-top: 16px; }
+    .class-list h3 { font-size: 15px; margin: 0 0 8px; }
+    .class-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+    .class-item.picked { border-color: #f59e0b; background: #fffbeb; }
+    .class-item .tag { font-size: 12px; font-weight: 800; color: #fff; padding: 2px 8px; border-radius: 6px; }
+    .class-item .tag.a { background: #4f46e5; } .class-item .tag.b { background: #f59e0b; }
+    .class-item .txt { flex: 1; min-width: 160px; font-size: 14px; }
+    .pick-btn, .del-btn, .clear-all { border: 1px solid var(--border); background: #fff; border-radius: 8px; min-height: 36px; padding: 0 10px; cursor: pointer; font-family: inherit; font-weight: 700; font-size: 13px; }
+    .del-btn { color: #dc2626; }
+    .clear-all { margin-top: 6px; color: #64748b; }
+    .class-summary { margin-top: 16px; background: #0f172a; color: #fff; border-radius: 12px; padding: 14px 16px; font-size: 15px; font-weight: 700; line-height: 1.7; }
+
+    /* ===== 앱 3에서 더한 모양 ===== */
+    .stage-nav { flex-wrap: wrap; }
+    .top-tools { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; }
+    .target-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+    .target-btn { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 8px; height: 38px; padding: 0 18px; font-weight: 800; font-size: 15px; cursor: pointer; font-family: inherit; }
+    .target-btn:hover { background: var(--button-hover); }
+    .target-btn.active { background: var(--selected); color: #fff; border-color: var(--selected); }
+    .num-input { width: 90px; height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 700; }
+
+    .ai-card { display: flex; gap: 14px; align-items: flex-start; background: #faf5ff; border: 1px solid #d8b4fe; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; animation: fadeIn 0.4s ease; }
+    .ai-card .face { font-size: 34px; line-height: 1; }
+    .ai-card .say { flex: 1; color: #3b0764; font-size: 15px; font-weight: 600; line-height: 1.7; }
+    .ai-card .say b { color: #6b21a8; }
+    .ai-card button { border: none; background: #7c3aed; color: #fff; font-weight: 800; border-radius: 10px; min-height: 38px; padding: 0 14px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .ai-again { border: 1px solid #d8b4fe; background: #faf5ff; color: #6b21a8; font-weight: 800; border-radius: 8px; height: 38px; padding: 0 12px; cursor: pointer; font-family: inherit; }
+
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+    .panel-title { font-size: 15px; font-weight: 800; color: #0f172a; margin: 0 0 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .panel-sub { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+    .meaning-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; font-weight: 700; margin: 0 0 10px; color: #334155; }
+    .m-dot { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 800; margin-right: 4px; padding: 0 6px; }
+
+    /* 1단계 */
+    .read-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+    .read-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #fff; }
+    .read-card.done { border-color: #86efac; background: #f7fef9; }
+    .read-card .no { font-size: 12px; font-weight: 800; color: #64748b; margin-bottom: 4px; }
+    .read-text { font-size: 19px; line-height: 2.1; margin-bottom: 6px; }
+    .tok { display: inline-block; padding: 0 5px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+    .tok:hover { background: #f1f5f9; }
+    .tok.is-target { background: var(--target-color); border-color: var(--target-border); font-weight: 800; cursor: default; }
+    .tok.is-clue { background: #dcfce7; border-color: #16a34a; font-weight: 800; }
+    .tok.in-win { box-shadow: inset 0 -6px 0 var(--context-color); }
+    .read-step { font-size: 13px; font-weight: 800; color: #334155; margin: 6px 0 4px; }
+    .m-pick { display: flex; gap: 6px; flex-wrap: wrap; }
+    .m-btn { min-height: 36px; border: 1.5px solid #cbd5e1; background: #fff; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 13px; font-family: inherit; color: #334155; padding: 0 10px; }
+    .m-btn:hover { background: #f1f5f9; }
+    .m-btn.on { color: #fff; }
+
+    .frame-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+    .frame-box .frame-title { font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 6px; }
+    .frame-tpl { font-size: 13px; color: #6b21a8; background: #faf5ff; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; font-weight: 700; }
+
+    /* 2단계 */
+    .scene-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .scene-btn { border: 1px solid var(--border); background: #fff; border-radius: 999px; min-height: 38px; padding: 0 16px; font-weight: 800; font-size: 14px; cursor: pointer; font-family: inherit; color: #475569; }
+    .scene-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .s2-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: #fff; max-height: 560px; }
+    .link-tag { display: inline-block; font-size: 14px; font-weight: 800; color: #1d4ed8; background: #dbeafe; border-radius: 6px; padding: 0 6px; margin: -2px 0 3px; }
+    table.s2 { min-width: 0; width: auto; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    table.s2 th, table.s2 td { min-width: 52px; padding: 6px 4px; }
+    table.s2 th:first-child, table.s2 td:first-child { min-width: 250px; text-align: left; }
+    table.s2 th.shared { color: var(--primary); }
+    table.s2 th.clue-col { background: #fde68a; }
+    table.s2 td.one { background: #dbeafe; color: #1d4ed8; font-weight: 800; }
+    table.s2 td.mix { background: #fef3c7; color: #92400e; font-weight: 800; }
+    table.s2 tr.link td { border-top: 3px solid #2563eb; }
+    table.s2 tr.gap td { border-top: 14px solid #f6f8fb; }
+    .chain-title { margin: 12px 0 6px; font-size: 16px; font-weight: 800; color: #1e3a8a; }
+    table.s2 tr.dragging td { background: #eff6ff !important; }
+    .row-label { display: flex; align-items: center; gap: 6px; }
+    .handle { cursor: grab; font-size: 18px; color: #94a3b8; padding: 0 4px; touch-action: none; user-select: none; }
+    .mv-box { display: inline-flex; gap: 4px; }
+    .mv { border: 1px solid var(--border); background: #fff; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 12px; padding: 0; }
+    .row-sen { font-size: 13px; font-weight: 600; color: #334155; }
+    .row-sen b { background: var(--target-color); padding: 0 3px; border-radius: 3px; }
+    .group-tag { font-size: 11px; font-weight: 800; color: #fff; padding: 1px 8px; border-radius: 6px; }
+    .s2-msg { margin: 10px 0; padding: 10px 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 14px; font-weight: 700; }
+    .s2-msg.ok { background: #f0fdf4; border-color: #86efac; color: #166534; }
+
+    /* 3단계 지도 */
+    .word-chip.big { font-size: 22px; padding: 12px 24px; background: var(--target-color); border-color: var(--target-border); color: #713f12; z-index: 32; }
+    .word-chip.occ { font-size: 14px; background: var(--target-color); color: #713f12; border-width: 3px; }
+    .word-chip.ctx { font-size: 12px; padding: 4px 10px; border-color: #93c5fd; color: #1e40af; background: #eff6ff; border-width: 1.5px; }
+    .word-chip.tag { color: #fff; border-color: transparent; font-size: 15px; padding: 8px 16px; z-index: 33; }
+    .word-chip.newq { font-size: 13px; background: #fff; border: 3px solid #0f172a; color: #0f172a; z-index: 34; }
+    .word-chip.newq b { background: var(--target-color); padding: 0 3px; border-radius: 3px; }
+    .word-chip.hide { opacity: 0; pointer-events: none; }
+    .word-chip.animate { transition: left 0.9s ease, top 0.9s ease, opacity 0.6s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+    .word-chip.glow { animation: glow 0.9s ease 3; }
+    @keyframes glow { 0%,100% { box-shadow: 0 0 0 0 rgba(234,179,8,0); } 50% { box-shadow: 0 0 0 8px rgba(234,179,8,.55); } }
+    .unknown-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 18%; border-top: 2px dashed #cbd5e1; background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 10px, #f8fafc 10px, #f8fafc 20px); z-index: 1; }
+    .unknown-zone span { position: absolute; right: 10px; bottom: 6px; font-size: 12px; font-weight: 800; color: #94a3b8; }
+    .ai-say { background: #faf5ff; border: 1px solid #e9d5ff; color: #3b0764; border-radius: 10px; padding: 12px 14px; font-size: 15px; font-weight: 600; line-height: 1.7; margin-bottom: 12px; }
+    .ai-say b { color: #6b21a8; }
+
+    .group-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; margin-top: 12px; }
+    .group-card { border: 2px solid var(--border); border-radius: 12px; padding: 12px; background: #fff; }
+    .group-card h4 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+    .group-card ul { margin: 0 0 10px; padding-left: 0; list-style: none; font-size: 14px; line-height: 1.9; }
+    .group-card li { display: flex; justify-content: space-between; gap: 6px; align-items: center; border-bottom: 1px dashed #e2e8f0; }
+    .mini-pill { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; color: #fff; white-space: nowrap; }
+    .mini-pill.none { background: #e2e8f0; color: #64748b; }
+
+    .check-card { border: 2px solid #0f172a; border-radius: 14px; padding: 16px; background: #fff; margin-top: 12px; }
+    .check-card .q { font-size: 22px; line-height: 2; margin: 4px 0 8px; }
+    .step-title { font-size: 14px; font-weight: 800; color: #0f172a; margin: 12px 0 6px; }
+    .big-btn { border: none; border-radius: 10px; background: #0f172a; color: #fff; font-weight: 800; font-size: 14px; min-height: 42px; padding: 0 18px; cursor: pointer; font-family: inherit; }
+    .big-btn.light { background: #fff; color: #0f172a; border: 1.5px solid #0f172a; }
+    .big-btn.on { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+    .why-input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 14px; background: #f8fafc; resize: vertical; }
+    .why-input:focus { outline: none; border-color: var(--primary); background: #fff; }
+    .human-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+    .human-item { padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .human-item.on { border-color: #16a34a; background: #f0fdf4; color: #166534; }
+    .no-badge { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 800; border-radius: 999px; height: 34px; padding: 0 14px; cursor: pointer; font-family: inherit; font-size: 14px; white-space: nowrap; }
+    .no-edit { display: inline-flex; gap: 6px; align-items: center; }
+    .start-wrap { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
+    .start-card { background: #fff; border: 1px solid var(--border); border-radius: 18px; padding: 36px 32px; text-align: center; max-width: 520px; width: 100%; box-shadow: 0 10px 30px rgba(15,23,42,.06); }
+    .teacher-skip { margin-top: 14px; border: none; background: none; color: #94a3b8; font-size: 12px; cursor: pointer; text-decoration: underline; font-family: inherit; }
+    .start-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+    .start-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 800; color: #334155; }
+    .start-form .num-input { width: 100%; height: 48px; font-size: 18px; text-align: center; }
+    .story-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 16px; }
+    .story-box { margin-bottom: 0; position: sticky; top: 10px; }
+    .story-text { font-size: 18px; line-height: 2.2; word-break: keep-all; }
+    .story-text p { margin: 0 0 10px; text-indent: 0.6em; }
+    .stok { cursor: pointer; border-radius: 999px; padding: 1px 2px; transition: background 0.15s; }
+    .stok:hover { background: #f1f5f9; }
+    .stok.found { border: 2.5px solid var(--wc); padding: 1px 6px; font-weight: 800; color: var(--wc); background: #fff; }
+    .stok.shake { animation: shake 0.35s; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+    .found-count { font-size: 13px; color: #16a34a; }
+    .word-list { display: flex; flex-direction: column; gap: 12px; }
+    .wl-card { background: #fff; border: 2px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+    .wl-card.closed { cursor: pointer; }
+    .wl-card.closed:hover { background: #f8fafc; }
+    .wl-head { display: flex; justify-content: space-between; align-items: center; }
+    .wl-word { font-size: 20px; font-weight: 900; }
+    .dots { display: flex; gap: 5px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #cbd5e1; display: inline-block; }
+    .dot.on { border-color: transparent; }
+    .wl-hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .wl-step { font-size: 14px; font-weight: 800; color: #0f172a; margin: 10px 0 6px; }
+    .snip { font-size: 14px; line-height: 1.9; background: #f8fafc; border-radius: 8px; padding: 4px 8px; margin-bottom: 4px; }
+    .snip-target { color: var(--wc); border: 2px solid var(--wc); border-radius: 999px; padding: 0 5px; font-weight: 800; }
+    .snip-tok { cursor: pointer; border-bottom: 2px dashed transparent; }
+    .snip-tok:hover { background: #eef2ff; }
+    .snip-tok.is-clue { border-bottom: 3px solid #16a34a; background: #dcfce7; font-weight: 800; }
+    .occ-row { margin-bottom: 10px; }
+    .occ-no { font-size: 12px; font-weight: 800; color: #475569; margin-bottom: 3px; }
+    .step-dots { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 4px; }
+    .step-dots span { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #94a3b8; }
+    .step-dots span.now { background: #0f172a; color: #fff; }
+    .step-dots span.done { background: #dcfce7; color: #166534; }
+    .snip.clickable { background: #fff; border: 1px dashed #cbd5e1; }
+    .hard-result { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.9; }
+    .cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .cmp-col { background: #f8fafc; border-radius: 10px; padding: 8px; min-height: 60px; }
+    .cmp-chip { display: inline-block; margin: 2px; padding: 2px 10px; border-radius: 999px; background: #dcfce7; color: #166534; font-weight: 800; font-size: 14px; }
+    .m-btn.sm { min-height: 32px; font-size: 12px; padding: 0 8px; }
+    .mark { align-self: center; }
+    .vote-chart { margin-top: 6px; }
+    .vbar-row { display: grid; grid-template-columns: minmax(80px, 38%) 1fr 36px; gap: 8px; align-items: center; margin: 4px 0; font-size: 13px; font-weight: 700; color: #334155; }
+    .vbar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vbar-track { height: 16px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+    .vbar-fill { display: block; height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+    .vbar-n { text-align: right; }
+    .vbar-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .guess-pill { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; color: #fff; }
+    .q-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .teacher-nums { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .teacher-nums summary { cursor: pointer; font-weight: 700; }
+
+    /* ===== 휴대폰 화면 ===== */
+    @media (max-width: 640px) {
+      .app { padding: 10px; }
+      header { gap: 8px; margin-bottom: 10px; }
+      h1 { font-size: 18px; line-height: 1.35; }
+      header > div { width: 100%; min-width: 0; }
+      .stage-nav { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; flex: 1 1 100%; min-width: 0; }
+      .stage-tab { white-space: nowrap; padding: 8px 10px; font-size: 13px; }
+      .section, .panel, .class-panel, .frame-box, .stage2-right { padding: 12px; border-radius: 12px; }
+      .target-btn { padding: 0 14px; }
+      .ai-card { flex-direction: column; gap: 8px; }
+      .ai-card .say { font-size: 14px; }
+      .ai-card button { width: 100%; }
+      .ai-again { height: 34px; font-size: 13px; }
+      .read-text { font-size: 18px; }
+      .m-pick .m-btn { flex: 1 1 auto; }
+      .scene-btn { flex: 1 1 auto; font-size: 13px; padding: 0 10px; }
+      table.s2 th, table.s2 td { min-width: 40px; padding: 5px 3px; font-size: 12px; }
+      table.s2 th:first-child, table.s2 td:first-child { min-width: 185px; max-width: 200px; }
+      .row-sen { font-size: 13px; }
+      .handle { display: none; }
+      .s2-wrap { max-height: none; }
+      .mv-box { flex-direction: column; gap: 3px; }
+      .mv { width: 30px; height: 26px; }
+      .stage2-workspace-container, .chip-workspace { min-height: 860px; }
+      .word-chip.big { font-size: 20px; padding: 10px 20px; }
+      .word-chip.occ { font-size: 13px; padding: 5px 10px; }
+      .word-chip.ctx { font-size: 11px; padding: 3px 8px; }
+      .word-chip.tag { font-size: 13px; padding: 6px 12px; }
+      .word-chip.newq { font-size: 12px; padding: 6px 10px; }
+      .drawing-toolbar { gap: 6px; padding: 6px 8px; }
+      .stage2-right-header .btn-group, .stage2-right-header .btn-group .action-btn { width: 100%; justify-content: center; }
+      .check-card { padding: 12px; }
+      .check-card .q { font-size: 19px; }
+      .q-line { font-size: 13px; }
+      .start-card { padding: 28px 18px; }
+      .next-btn { width: 100%; }
+      .story-layout { grid-template-columns: 1fr; }
+      .story-box { position: static; }
+      .story-text { font-size: 17px; }
+      .start-form { grid-template-columns: 1fr; }
+      .bottom-area { padding-bottom: 24px; }
+    }
+    .wrap-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 6px 0 12px; }
+    .wrap-slot { position: relative; min-height: 96px; border: 2px dashed #cbd5e1; border-radius: 14px; padding: 10px 12px; background: #f8fafc; display: flex; flex-direction: column; gap: 4px; }
+    .wrap-slot.filled { border-style: solid; border-color: #7c3aed; background: #f5f3ff; cursor: pointer; }
+    .wrap-no { font-weight: 900; color: #7c3aed; font-size: 18px; }
+    .wrap-name { font-weight: 800; font-size: 18px; color: #0f172a; }
+    .wrap-say { font-size: 15px; color: #475569; }
+    .wrap-empty { font-size: 24px; color: #cbd5e1; font-weight: 800; }
+    .wrap-mark { position: absolute; top: 6px; right: 10px; font-size: 24px; }
+    .wrap-pool { display: flex; flex-wrap: wrap; gap: 10px; }
+    .wrap-card { border: 2px solid #c4b5fd; background: #fff; border-radius: 14px; padding: 10px 16px; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 18px; color: #0f172a; text-align: left; }
+    .wrap-card span { font-size: 15px; color: #475569; }
+    .wrap-card:hover { background: #f5f3ff; }
+    .wrap-hint { margin-top: 8px; font-weight: 800; color: #b45309; font-size: 16px; }
+    @media (max-width: 760px) { .wrap-slots { grid-template-columns: 1fr; } }
+    .duel-dots { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 4px; }
+    .duel-dot { border: 2px solid var(--border); background: #fff; border-radius: 999px; padding: 6px 16px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; color: #475569; }
+    .duel-dot.now { border-color: #0f172a; color: #0f172a; }
+    .duel-dot.done { background: #f8fafc; }
+    .check-card .step-title { font-size: 16px; }
+    .check-card .m-btn { font-size: 16px; }
+    .pbars { display: grid; gap: 8px; margin: 6px 0 12px; }
+    .pbar-row { display: grid; grid-template-columns: minmax(150px, max-content) 1fr 56px; gap: 10px; align-items: center; }
+    .pbar-label { font-size: 16px; font-weight: 800; color: #0f172a; }
+    .pbar-track { height: 26px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+    .pbar-fill { display: block; height: 100%; border-radius: 999px; transition: width .8s ease; }
+    .pbar-n { font-size: 18px; font-weight: 900; text-align: right; color: #0f172a; }
+    .ai-say.flip { background: #dcfce7; border-color: #86efac; }
+    .add-list { margin: 10px 0 4px; display: grid; gap: 6px; }
+    .add-item { font-size: 18px; }
+    .add-item .mini-pill { font-size: 15px; padding: 3px 10px; }
+    .check-card .ai-say { font-size: 17px; }
+    .teach-input { width: 100%; font-size: 20px; padding: 10px 14px; border: 2px solid var(--border); border-radius: 12px; font-family: inherit; }
+    .teach-input:focus { outline: none; border-color: #2563eb; }
+    .teach-err { margin-top: 8px; min-height: 22px; font-size: 16px; font-weight: 800; color: #dc2626; }
+    .teach-end { margin-top: 12px; font-size: 20px; font-weight: 900; color: #0f172a; }
+    .left-n { color: #2563eb; }
+    .q-lead { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.6; margin-bottom: 10px; }
+    .q-data { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #f8fafc; display: grid; gap: 8px; font-size: 18px; }
+    .q-key { display: inline-block; min-width: 150px; font-weight: 800; color: #475569; }
+    .q-result { margin-top: 12px; font-size: 18px; font-weight: 800; color: #0f172a; background: #f1f5f9; border-radius: 10px; padding: 10px 14px; }
+    .q-result.ok { background: #dcfce7; }
+    .q-ask { margin-top: 14px; margin-bottom: 8px; font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.6; }
+    .home-btn { background: #fff; }
+  </style>
+  <!-- 깃허브 배포: 시트 연결 설정과 연결 파일 -->
+  <script src="../config.js"></script>
+  <script src="../gas-bridge.js"></script>
+</head>
+<body>
+  <main id="app" class="app"></main>
+
+  <script>
+    /* =====================================================================
+       ★ 선생님이 바꾸는 곳 ★
+       ※ 어구는 이제 관리자 페이지(주소 끝에 ?page=admin)에서 고릅니다.
+         관리자 페이지에서 ✅가 된 낱말은 시트 '앱3 어구'의 수업·점검 어구를 불러오고,
+         아직 고르지 않았거나 시트를 못 읽으면 아래 어구를 그대로 씁니다.
+       - meanings : 뜻 이름표 (학생이 고르는 보기, 뜻코드 1·2·3 = A·B·C)
+       - sentences: 제시 문장 (m = 그 문장에서 쓰인 뜻의 id)
+       - checks   : 4단계 '컴퓨터 가르치기' 문제 2개 — 1~3단계와 따로 움직임
+                    learned = 가상의 컴퓨터가 학습을 마친 결과: '옆 말=①횟수/②횟수(/③횟수)'
+                    (예: "행사=4/0; 없는=0/2" → '행사'를 ① 뜻 문장에서 4번, '없는'을 ② 뜻 문장에서 2번 봄)
+                    학생이 넣은 문장은 1번으로 셈. 틀린 뜻 쪽이 2~4 정도 높으면 3번 안에 바꿀 수 있음
+       ※ 문장은 띄어쓰기로 나누어 셉니다. 목표 낱말은 조사 없이 따로 쓰고('무료한'은 알아봄),
+         옆 말에도 조사를 붙이지 않습니다. 같은 뜻 문장끼리는 옆 말이 하나 이상 겹치게 만들어 주세요.
+       ===================================================================== */
+    const WINDOW = 2;   // 컴퓨터가 양옆으로 보는 칸 수 (고정)
+    const LEXICON = {
+      "반려": {
+        meanings: [{ id: "A", name: "곁에서 함께 지내는 짝" }, { id: "B", name: "받지 않고 되돌려 보냄" }],
+        sentences: [
+          { text: "우리 집 반려 강아지 산책", m: "A" },
+          { text: "학교 신청서 반려 이유", m: "B" },
+          { text: "반려 강아지 사료 고르기", m: "A" },
+          { text: "보고서 반려 이유 설명", m: "B" },
+          { text: "반려 고양이 사료 걱정", m: "A" },
+          { text: "결재 서류 반려 통보", m: "B" },
+          { text: "새 반려 고양이 입양", m: "A" },
+          { text: "보고서 반려 통보 받음", m: "B" }
+        ],
+        checks: [{ text: "강아지 사료 서류 반려", m: "B", learned: "사료=4/0; 서류=0/2" }, { text: "고양이 신청서 반려", m: "B", learned: "고양이=4/0; 신청서=0/2" }]
+      },
+      "무료": {
+        meanings: [{ id: "A", name: "돈을 내지 않음" }, { id: "B", name: "지루하고 심심함" }],
+        sentences: [
+          { text: "주말 박물관 무료 입장", m: "A" },
+          { text: "할 일 없는 무료한 오후", m: "B" },
+          { text: "놀이공원 무료 입장 행사", m: "A" },
+          { text: "비 오는 날 무료한 오후", m: "B" },
+          { text: "음료 무료 쿠폰 행사", m: "A" },
+          { text: "방학 내내 무료한 오후", m: "B" },
+          { text: "배송비 무료 쿠폰", m: "A" },
+          { text: "심심하고 무료한 오후", m: "B" }
+        ],
+        checks: [{ text: "행사 없는 무료한 하루", m: "B", learned: "행사=4/0; 없는=0/2" }, { text: "박물관 휴관 무료한 하루", m: "B", learned: "박물관=2/0" }]
+      },
+      "의사": {
+        meanings: [{ id: "A", name: "병을 고치는 사람" }, { id: "B", name: "나라를 위해 목숨 바친 사람" }, { id: "C", name: "무엇을 하려는 생각" }],
+        sentences: [
+          { text: "동네 병원 의사 진료", m: "A" },
+          { text: "안중근 의사 기념관", m: "B" },
+          { text: "반대 의사 표현", m: "C" },
+          { text: "치과 의사 진료", m: "A" },
+          { text: "윤봉길 의사 기념관 견학", m: "B" },
+          { text: "찬성 의사 표현", m: "C" },
+          { text: "소아과 의사 진료 시간", m: "A" },
+          { text: "독립운동가 안중근 의사 이야기", m: "B" },
+          { text: "참가 의사 표현 하기", m: "C" }
+        ],
+        checks: [{ text: "기념관 반대 의사", m: "C", learned: "기념관=0/4/0; 반대=0/0/2" }, { text: "견학 거절 의사", m: "C", learned: "견학=0/2/0" }]
+      },
+      "연패": {
+        meanings: [{ id: "A", name: "계속 짐" }, { id: "B", name: "계속 이김(우승)" }],
+        sentences: [
+          { text: "축구부 연패 탈출 작전", m: "A" },
+          { text: "대회 3 연패 우승", m: "B" },
+          { text: "야구부 연패 탈출 성공", m: "A" },
+          { text: "올림픽 2 연패 금메달", m: "B" },
+          { text: "긴 연패 늪 탈출", m: "A" },
+          { text: "줄넘기 대회 2 연패 달성", m: "B" },
+          { text: "농구부 긴 연패 늪", m: "A" },
+          { text: "세계 대회 연패 금메달", m: "B" }
+        ],
+        checks: [{ text: "올림픽 연패 충격", m: "A", learned: "올림픽=0/2" }, { text: "농구부 연패 축하", m: "B", learned: "농구부=2/0" }]
+      }
+    };
+    const TARGETS = Object.keys(LEXICON);
+    const MEANING_COLORS = ["#4f46e5", "#f59e0b", "#16a34a"];
+    const GROUP_COLORS = ["#7c3aed", "#0d9488", "#db2777", "#ea580c", "#0891b2", "#65a30d"];
+    const GROUP_NAMES = ["가", "나", "다", "라", "마", "바"];
+    const SHORT = ["①", "②", "③"];
+    const TARGET_SUFFIX = ["한", "함", "하다", "해", "했다", "하게", "하고", "된", "을", "를", "이", "가", "은", "는", "의", "에", "로", "으로", "도", "만"];
+    const TAB_NAMES = ["📖 글 읽기", "1단계: 문맥 살피기", "2단계: 문맥 단서 세기", "3단계: 뜻 추론하기", "4단계: 추론 점검·수정하기", "🧭 마무리"];
+
+    /* ★ 선생님이 바꾸는 곳: 앱 맨 앞 '글 읽기'
+       answers: 글에 나온 순서대로 각 낱말의 뜻 id (위 LEXICON의 meanings 기준) */
+    const STORY = {
+      title: "속상했던 주말",
+      paragraphs: [
+        "우리 학교 피구부는 올해 대회에서 3연패를 당했다. 반면 옆 학교 피구부는 같은 대회에서 3연패를 달성해 우승기를 또 가져갔다. 속상한 마음에 주말 내내 집에서 무료한 시간을 보내고 있는데, 엄마가 박물관에서 무료 입장 행사를 한다며 같이 가자고 하셨다.",
+        "우리는 반려견 콩이를 할머니 댁에 맡기고 박물관으로 향했다. 박물관에는 나라를 위해 목숨을 바친 안중근 의사의 유물이 전시되어 있었다. 관람을 마치고 나오다 동생이 넘어져 무릎을 다쳤고, 근처 병원 의사 선생님께 치료를 받았다.",
+        "집에 돌아오니 코치님께 연락이 와 있었다. 내가 낸 다음 대회 참가 신청서가 보호자 서명이 빠져서 반려되었다는 것이다."
+      ],
+      answers: { "연패": ["A", "B"], "무료": ["B", "A"], "반려": ["A", "B"], "의사": ["B", "A"] },
+      check: { word: "연패", s1: "우리 팀의 연패 기록이 드디어 끝났다.", s2: "선수들은 기뻐서 서로 껴안았다.", answer: "A" }
+    };
+    const WORD_COLORS = { "연패": "#e11d48", "무료": "#2563eb", "반려": "#16a34a", "의사": "#9333ea" };
+    const CLASS_KEY_LENGTH = 4;   // 번호 앞 몇 자리가 같으면 같은 반으로 볼지 (예: 260601 → 2606)
+
+    const AI_CARDS = {
+      1: "안녕하세요! 저는 낱말의 뜻을 몰라요. 대신 <b>옆에 나온 말을 셀 수 있어요.</b><br>'배가 고프다'의 배와 '배를 타다'의 배처럼, 같은 낱말도 뜻이 여러 개일 수 있어요. 여러분이 먼저 읽어 보세요. 문장마다 <b>① 뜻을 알려 준 말(단서)을 눌러 표시</b>하고 <b>② 뜻을 골라요.</b>",
+      2: "이제 제 차례예요. 저는 처음에 이 낱말이 <b>모두 같은 뜻</b>인 줄 알아요. 그런데 문장마다 줄을 펼쳐 보면 옆에 오는 말이 달라요.<br><b>0과 1 모양이 닮은 줄끼리 위아래로 모아 보세요.</b>",
+      3: "제가 <b>0과 1 모양이 닮은 줄끼리</b> 모은 대로 낱말을 나눠 볼게요. <b>[✂️ 옆 말로 나누기]</b>를 눌러 보세요.<br>그런데 나뉜 덩어리가 어떤 뜻인지는 저도 몰라요. <b>여러분이 이름표를 붙여 주세요.</b>",
+      4: ""
+    };
+    const FRAMES = {
+      1: "나는 앞뒤 ○○까지 읽었고, AI는 윈도우 설정에 따라 △칸만 본다.",
+      2: "사람은 ○○를 단서로 골랐고, AI는 △△를 □번 세었다.",
+      3: "사람은 ○○를 보고 짐작했고, AI는 △△를 세어서 판단했다.",
+      4: "처음에는 ○○라고 생각했는데, △△를 읽고 □□로 고쳤다(또는 그대로 두었다)."
+    };
+    const HUMAN_DECISIONS = ["어구를 모으고 뜻을 표시한 것", "어떤 문장을 보여 줄지 고른 것", "양옆 몇 칸까지 셀지 정한 것", "덩어리마다 뜻 이름표를 붙인 것", "뜻이 몇 개인지 정한 것"];
+
+    const HAS_SERVER = typeof google !== "undefined" && google.script && google.script.run;
+    const STORAGE_KEY = "polysemy_split_app3_v2";
+
+    function defaultState() {
+      return {
+        currentStage: 0, currentTarget: STORY.check.word, sceneV2: true, studentNo: "", school: "",
+        story: {},      // 글 읽기 기록
+        first: {},      // first[낱말][문장] = { m, clues: [] }
+        showWin: false,
+        winAsk: false,
+        scene: {},      // scene[낱말] = 0 펼쳐 모으기 · 1 합치기
+        showChain: {},  // showChain[낱말] = ②에서 '컴퓨터가 모은 순서 보기'를 열었는지
+        order: {},      // order[낱말] = 줄 순서
+        split: {},      // split[낱말] = 지도에서 나눴는지
+        names: {},      // names[낱말][덩어리] = 뜻 id (학생이 붙인 이름표)
+        teach: {},      // teach[낱말] = { cur, items: { 문제번호: { adds: [{ text, m }], say } } }  (4단계 컴퓨터 가르치기)
+        human: {}, frames: {}, cardSeen: {}, chipPositions: {},
+        lexSig: {},    // lexSig[낱말] = 지금 쓰는 어구 묶음 (바뀌면 그 낱말 기록을 새로 시작)
+        wrap: {}       // 마무리: 나의 읽기 순서
+      };
+    }
+    function loadState() {
+      const base = defaultState();
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return base;
+        const s = JSON.parse(raw);
+        const obj = v => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+        const out = { ...base };
+        Object.keys(base).forEach(k => { if (typeof base[k] === "object") out[k] = obj(s[k]); });
+        out.currentStage = [0, 1, 2, 3, 4, 5].includes(s.currentStage) ? s.currentStage : 0;
+        out.school = typeof s.school === "string" ? s.school : "";
+        out.currentTarget = TARGETS.includes(s.currentTarget) ? s.currentTarget : TARGETS[0];
+        out.studentNo = typeof s.studentNo === "string" ? s.studentNo : "";
+        out.showWin = !!s.showWin;
+        out.winAsk = !!s.winAsk;
+        out.started = !!s.started;
+        if (!s.sceneV2) Object.keys(out.scene).forEach(t => { out.scene[t] = out.scene[t] === 2 ? 1 : 0; });
+        out.sceneV2 = true;
+        return out;
+      } catch (e) { return base; }
+    }
+    let state = loadState();
+    function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {} }
+    function sub(name, t) { return state[name][t] || (state[name][t] = {}); }
+
+    let drawTool = 'off', drawColor = '#ef4444', drawSize = 4, stage2Canvas = null, stage2Ctx = null;
+    const drawingBufferCanvas = document.createElement("canvas");
+    const drawingBufferCtx = drawingBufferCanvas.getContext("2d");
+
+    /* ===== 관리자 페이지에서 고른 어구 불러오기 ===== */
+    // 어구가 바뀌면 그 부분 기록만 새로 시작: 수업 어구 → 1~3단계, 가르치기 문제 → 4단계
+    function resetWord(t) { ["first", "order", "scene", "showChain", "split", "names", "chipPositions"].forEach(k => { delete state[k][t]; }); }
+    function syncLexSig() {
+      let changed = false;
+      TARGETS.forEach(t => {
+        const s1 = JSON.stringify(LEXICON[t].sentences), s4 = JSON.stringify(LEXICON[t].checks), old = state.lexSig[t];
+        const o = typeof old === "object" && old ? old : null;
+        if (o && o.lesson !== s1) { resetWord(t); changed = true; }
+        if (o && o.teach !== s4) { delete state.teach[t]; changed = true; }
+        if (typeof old === "string" && old !== JSON.stringify([LEXICON[t].sentences, LEXICON[t].checks])) { resetWord(t); delete state.teach[t]; changed = true; }
+        state.lexSig[t] = { lesson: s1, teach: s4 };
+      });
+      saveState();
+      return changed;
+    }
+    // 1~3단계 수업 어구와 4단계 가르치기 문제는 따로 확인하고 따로 바꾼다
+    function okItem(t, s) { const ids = LEXICON[t].meanings.map(m => m.id); return s && typeof s.text === "string" && ids.includes(s.m) && contextOf(s.text, t).tIdx.length > 0; }
+    function validLesson(t, d) {
+      if (!d || !Array.isArray(d.sentences) || d.sentences.length < 2 || !d.sentences.every(s => okItem(t, s))) return false;
+      const used = new Set(d.sentences.map(s => s.m));
+      return LEXICON[t].meanings.every(m => used.has(m.id));
+    }
+    function applyLexicon(data) {
+      TARGETS.forEach(t => {
+        const d = data && data[t];
+        if (validLesson(t, d)) {
+          const backup = LEXICON[t].sentences;
+          LEXICON[t].sentences = d.sentences.map(s => ({ text: s.text, m: s.m }));
+          // 관리자 페이지의 ✅와 같은 조건: 덩어리 수 = 뜻 수, 덩어리마다 한 뜻, 수업 어구 4~12개
+          const groups = computeGroups(t), n = d.sentences.length;
+          const pure = groups.every(g => new Set(g.map(i => LEXICON[t].sentences[i].m)).size === 1);
+          if (groups.length !== LEXICON[t].meanings.length || !pure || n < 4 || n > 12) LEXICON[t].sentences = backup;
+        }
+        if (d && Array.isArray(d.checks)) {
+          const cks = d.checks.filter(s => okItem(t, s)).slice(0, 2);
+          if (cks.length) LEXICON[t].checks = cks.map(s => ({ text: s.text, m: s.m, learned: s.learned || "" }));
+        }
+      });
+      const changed = syncLexSig();
+      if (changed && state.started) keepScrollRender();
+    }
+    function loadLexicon() {
+      if (!HAS_SERVER) {
+        // 미리보기: 관리자 페이지(admin.html)가 이 브라우저에 저장한 어구를 읽는다
+        try {
+          const rows = JSON.parse(localStorage.getItem("app3_admin_rows_v1") || "null");
+          if (Array.isArray(rows)) {
+            const ids = ["A", "B", "C"], out = {};
+            rows.forEach(p => {
+              if (!["수업", "점검"].includes(p.use) || !(p.code >= 1 && p.code <= 3)) return;
+              const w = out[p.word] || (out[p.word] = { sentences: [], checks: [] }), it = { text: p.text, m: ids[p.code - 1] };
+              if (p.use === "수업") w.sentences.push(it); else if (p.use === "점검") w.checks.push({ ...it, learned: p.learned || "" });
+            });
+            applyLexicon(out);
+          }
+        } catch (e) {}
+        return;
+      }
+      google.script.run.withSuccessHandler(applyLexicon).withFailureHandler(() => {}).getApp3Lexicon();
+    }
+
+    /* ===== 세기 (화면 뒤에서) ===== */
+    function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+    function tokensOf(text) { return String(text || "").trim().split(/\s+/).map(t => t.replace(/[.,!?~"'“”‘’()\[\]…·:;]/g, "")).filter(Boolean); }
+    function isTarget(tok, t) { return tok === t || (tok.startsWith(t) && TARGET_SUFFIX.includes(tok.slice(t.length))); }
+    function contextOf(text, t) {
+      const toks = tokensOf(text);
+      const tIdx = toks.map((x, i) => isTarget(x, t) ? i : -1).filter(i => i >= 0);
+      const ctxIdx = new Set(), ctx = [];
+      tIdx.forEach(i => { for (let j = Math.max(0, i - WINDOW); j <= Math.min(toks.length - 1, i + WINDOW); j++) if (!tIdx.includes(j)) { ctx.push(toks[j]); ctxIdx.add(j); } });
+      return { toks, tIdx, ctxIdx, ctx };
+    }
+    function sentCtx(t) { return LEXICON[t].sentences.map(s => contextOf(s.text, t).ctx); }
+    function shareWord(a, b) { return a.some(w => b.includes(w)); }
+
+    // 컴퓨터가 찾은 덩어리: 옆 말이 하나라도 겹치는 문장끼리 이어 모은다
+    function computeGroups(t) {
+      const C = sentCtx(t), n = C.length, p = C.map((_, i) => i);
+      const f = x => p[x] === x ? x : (p[x] = f(p[x]));
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (shareWord(C[i], C[j])) p[f(i)] = f(j);
+      const map = {}, groups = [];
+      for (let i = 0; i < n; i++) { const r = f(i); if (map[r] == null) { map[r] = groups.length; groups.push([]); } groups[map[r]].push(i); }
+      return groups;
+    }
+    function groupOf(t, i) { return computeGroups(t).findIndex(g => g.includes(i)); }
+    function groupWords(t, gi) { const C = sentCtx(t); const w = {}; computeGroups(t)[gi].forEach(i => C[i].forEach(x => { w[x] = (w[x] || 0) + 1; })); return w; }
+
+    // 새 문장 판단: 옆 말이 겹치는 덩어리를 고른다 (점수는 화면에 보이지 않음)
+    function judgeNew(t, text) {
+      const ctx = contextOf(text, t).ctx;
+      const groups = computeGroups(t);
+      const scores = groups.map((g, gi) => { const w = groupWords(t, gi); return ctx.reduce((a, x) => a + (w[x] || 0), 0); });
+      const hits = groups.map((g, gi) => { const w = groupWords(t, gi); return ctx.filter(x => w[x]); });
+      const max = Math.max(...scores);
+      const tops = scores.map((s, i) => s === max ? i : -1).filter(i => i >= 0);
+      if (max === 0) return { kind: "unknown", ctx, scores, hits };
+      if (tops.length > 1) return { kind: "tie", ctx, scores, hits, tops };
+      return { kind: "pick", group: tops[0], ctx, scores, hits };
+    }
+
+    function meaningInfo(t, id) { const ms = LEXICON[t].meanings; const i = ms.findIndex(m => m.id === id); return i < 0 ? null : { ...ms[i], short: SHORT[i], color: MEANING_COLORS[i] }; }
+    function pill(t, id, cls) { const mi = meaningInfo(t, id); return mi ? `<span class="${cls || "mini-pill"}" style="background:${mi.color}">${mi.short} ${esc(mi.name)}</span>` : `<span class="${cls || "mini-pill"} none">아직 안 골랐어요</span>`; }
+    function groupLabel(t, gi) { const id = (state.names[t] || {})[gi]; const mi = meaningInfo(t, id); return mi ? `${mi.short} ${mi.name}` : `덩어리 ${GROUP_NAMES[gi]}`; }
+    function sentHTML(t, text) { return tokensOf(text).map(x => isTarget(x, t) ? `<b>${esc(x)}</b>` : esc(x)).join(" "); }
+    function myClueWords(t) {
+      const f = state.first[t] || {}, words = new Set();
+      LEXICON[t].sentences.forEach((s, i) => { const toks = tokensOf(s.text); ((f[i] && f[i].clues) || []).forEach(k => toks[k] && words.add(toks[k])); });
+      return [...words];
+    }
+
+    /* ===== 공통 조각 ===== */
+    function headerHTML(active) {
+      return `<header><h1>같은 낱말, 옆 말로 뜻을 나눌 수 있을까?</h1>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <div class="stage-nav">${TAB_NAMES.map((n, i) => `<button class="stage-tab ${active === i ? "active" : ""}" onclick="switchStage(${i})">${n}</button>`).join("")}</div>
+          ${editingNo
+            ? `<span class="no-edit"><input class="num-input" id="schoolEdit" type="text" value="${esc(state.school)}" placeholder="학교명" style="width:110px; height:34px"><input class="num-input" id="noEdit" type="text" inputmode="numeric" value="${esc(state.studentNo)}" placeholder="260601" style="width:90px; height:34px"><button type="button" class="no-badge" onclick="saveNoEdit()">확인</button></span>`
+            : `<button type="button" class="no-badge" onclick="startNoEdit()" title="눌러서 고치기">🙋 ${state.studentNo ? `${esc(state.school)} ${esc(state.studentNo)}` : "번호 없음"}</button>`}
+          ${state.studentNo ? "" : `<button type="button" class="no-badge home-btn" onclick="goStartScreen()">🏠 처음 화면</button>`}
+        </div></header>`;
+    }
+    // 처음 화면(학교명·번호 입력)으로 돌아가기: 선생님용 버튼, 관리자 페이지의 '처음 화면으로'
+    let forceStart = false;
+    function goStartScreen() { forceStart = true; editingNo = false; window.scrollTo({ top: 0 }); render(); }
+    function toolsHTML() {
+      return `<section class="section"><div class="top-tools">
+          <div class="control-group"><span class="label">[목표 낱말 선택]</span>
+            <div class="target-buttons">${TARGETS.map(t => `<button type="button" class="target-btn ${state.currentTarget === t ? "active" : ""}" onclick="setTarget('${t}')">${t}</button>`).join("")}</div></div>
+          ${state.cardSeen[state.currentStage] ? `<button type="button" class="ai-again" onclick="showCardAgain()">🤖 안내 다시 보기</button>` : ""}
+        </div></section>`;
+    }
+    function aiCardHTML(stage) {
+      if (state.cardSeen[stage]) return "";
+      return `<div class="ai-card"><div class="face">🤖</div><div class="say">${AI_CARDS[stage]}</div><button type="button" onclick="closeCard()">알겠어요</button></div>`;
+    }
+    function legendHTML(t) { return `<div class="meaning-legend">${LEXICON[t].meanings.map((m, i) => `<span><span class="m-dot" style="background:${MEANING_COLORS[i]}">${SHORT[i]}</span>${esc(m.name)}</span>`).join("")}</div>`; }
+    function frameHTML(k, title) {
+      return `<div class="frame-box"><div class="frame-title">✍️ ${title}</div><div class="frame-tpl">${FRAMES[k]}</div>
+        <textarea class="student-answer-input" id="frame-${k}" rows="2" data-frame="${k}" placeholder="문장 틀의 ○○, △△를 채워 써 보세요.">${esc(state.frames[k] || "")}</textarea></div>`;
+    }
+    function closeCard() { state.cardSeen[state.currentStage] = true; saveState(); keepScrollRender(); }
+    function showCardAgain() { state.cardSeen[state.currentStage] = false; saveState(); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    let editingNo = false, startErr = "";
+    function startNoEdit() { editingNo = true; keepScrollRender(); const el = document.getElementById("noEdit"); if (el) el.focus(); }
+    function saveNoEdit() { const el = document.getElementById("noEdit"), sc = document.getElementById("schoolEdit"); setStudentNo(el ? el.value : state.studentNo); if (sc) state.school = sc.value.trim().slice(0, 20); editingNo = false; saveState(); keepScrollRender(); loadVotes(); }
+    function renderStart() {
+      return `<div class="start-wrap"><div class="start-card">
+          <div style="font-size:44px">🙋</div>
+          <h1 style="margin:6px 0 4px">같은 낱말, 옆 말로 뜻을 나눌 수 있을까?</h1>
+          <p style="color:var(--muted); margin:0 0 18px">학교명과 번호를 적고 시작해요. 내 생각과 투표가 이 번호로 모여요.</p>
+          <div class="start-form">
+            <label>학교명<input class="num-input" id="startSchool" type="text" placeholder="예: 소일초" value="${esc(state.school)}"></label>
+            <label>번호<input class="num-input" id="startNo" type="text" inputmode="numeric" placeholder="260601" value="${esc(state.studentNo)}" onkeydown="if(event.key==='Enter')startApp()"></label>
+          </div>
+          <button type="button" class="big-btn" style="min-height:48px; width:100%; margin-top:12px" onclick="startApp()">시작하기 →</button>
+          <div style="color:#dc2626; font-size:13px; font-weight:700; min-height:20px; margin-top:8px">${esc(startErr)}</div>
+          <button type="button" class="teacher-skip" onclick="skipStart()">선생님: 번호 없이 둘러보기</button>
+          ${HAS_SERVER ? "" : `<div style="margin-top:6px"><a class="teacher-skip" href="admin.html">🛠️ 선생님: 어구 관리(관리자 페이지)</a></div>`}
+        </div></div>`;
+    }
+    function startApp() {
+      const sc = (document.getElementById("startSchool") || {}).value || "", no = (document.getElementById("startNo") || {}).value || "";
+      if (!sc.trim() || !no.trim()) { startErr = !sc.trim() ? "학교명을 적어 주세요." : "번호를 적어 주세요."; render(); return; }
+      startErr = ""; forceStart = false; state.school = sc.trim().slice(0, 20); setStudentNo(no); state.started = true; state.currentStage = 0; saveState(); render(); loadVotes();
+    }
+    function skipStart() { forceStart = false; state.studentNo = ""; state.started = true; state.currentStage = 0; saveState(); render(); }
+    function setStudentNo(v) { state.studentNo = String(v || "").trim().slice(0, 10); saveState(); }
+    function setTarget(t) { state.currentTarget = t; saveState(); keepScrollRender(); }
+
+
+    /* ===== 📖 글 읽기: 사람의 문맥 추론 ===== */
+    function storyTokens() {
+      const out = [];
+      STORY.paragraphs.forEach((p, pi) => {
+        let sent = 0;
+        p.split(/\s+/).forEach((tok, ti) => {
+          const word = TARGETS.find(w => tok.includes(w)) || null;
+          out.push({ id: `p${pi}t${ti}`, pi, ti, tok, word, sent: `${pi}-${sent}` });
+          if (/[.?!]$/.test(tok)) sent++;
+        });
+      });
+      const seen = {};
+      out.forEach(o => { if (o.word) { seen[o.word] = (seen[o.word] || 0); o.nth = seen[o.word]; o.answer = STORY.answers[o.word][o.nth]; seen[o.word]++; } });
+      return out;
+    }
+    function storyWords() { const ws = []; storyTokens().forEach(o => { if (o.word && !ws.includes(o.word)) ws.push(o.word); }); return ws; }
+    function occsOf(word) { return storyTokens().filter(o => o.word === word); }
+    function sentenceOf(o) { return storyTokens().filter(x => x.sent === o.sent); }
+    function S() { return state.story; }
+    function storySub(k) { return S()[k] || (S()[k] = {}); }
+    function foundCount(word) { const f = storySub("found"); return occsOf(word).filter(o => f[o.id]).length; }
+    const ALL_OCC = () => storyTokens().filter(o => o.word);
+
+    function renderStory() {
+      const toks = storyTokens(), f = storySub("found"), total = ALL_OCC().length, nFound = ALL_OCC().filter(o => f[o.id]).length;
+      const allMeant = TARGETS.every(w => storySub("checked")[w]);
+      let para = -1;
+      const storyHTML = toks.map(o => {
+        const open = o.pi !== para ? (para >= 0 ? "</p><p>" : "<p>") : "";
+        para = o.pi;
+        const isFound = o.word && f[o.id];
+        return `${open}<span class="stok ${isFound ? "found" : ""}" data-id="${o.id}" style="${isFound ? `--wc:${WORD_COLORS[o.word]}` : ""}" onclick="tapStory('${o.id}', this)">${esc(o.tok)}</span> `;
+      }).join("") + "</p>";
+      return `${headerHTML(0)}
+        <div class="ai-card" style="animation:none; background:#fff7ed; border-color:#fdba74">
+          <div class="face">📖</div>
+          <div class="say" style="color:#7c2d12">먼저 <b>사람</b>이 읽어 봐요. 글에서 <b>연패 · 무료 · 반려 · 의사</b>를 모두 찾아 눌러 보세요. 찾은 낱말은 낱말 목록에 모여요.</div>
+        </div>
+        <div class="story-layout">
+          <section class="panel story-box">
+            <div class="panel-title"><span>〈${esc(STORY.title)}〉</span><span class="found-count">찾은 낱말 ${nFound}개${nFound === total ? " ✔" : ""}</span></div>
+            <div class="story-text">${storyHTML}</div>
+            ${nFound === total ? `<div class="s2-msg ok" style="margin:10px 0 0">🎉 낱말은 4개인데 동그라미는 ${total}개! 같은 낱말이 두 번씩 나왔어요. 낱말 목록에서 하나씩 살펴보세요.</div>` : ""}
+          </section>
+          <aside class="word-list">${storyWords().map(w => wordCardHTML(w)).join("")}</aside>
+        </div>
+        ${allMeant ? storyCheckHTML() : `<p class="rule-note" style="margin:0 0 16px">네 낱말의 뜻을 모두 고르고 확인하면, 마지막 점검 문제가 열려요.</p>`}
+        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(1)">다음 단계 (1단계 문맥 살피기) →</button></div>`;
+    }
+
+    function tapStory(id, el) {
+      const o = storyTokens().find(x => x.id === id);
+      if (!o || !o.word) { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); return; }
+      const f = storySub("found");
+      if (f[id]) return;
+      f[id] = true;
+      if (foundCount(o.word) === occsOf(o.word).length) S().open = o.word;
+      saveState(); keepScrollRender();
+    }
+
+    function snippetHTML(o, clickable) {
+      const clues = (storySub("clues")[o.id]) || [];
+      return sentenceOf(o).map(x => {
+        if (x.id === o.id) return `<span class="snip-target" style="--wc:${WORD_COLORS[o.word]}">${esc(x.tok)}</span>`;
+        if (clickable) return `<span class="snip-tok ${clues.includes(x.id) ? "is-clue" : ""}" onclick="toggleStoryClue('${o.id}','${x.id}')">${esc(x.tok)}</span>`;
+        return clues.includes(x.id) ? `<span class="snip-tok is-clue">${esc(x.tok)}</span>` : esc(x.tok);
+      }).join(" ");
+    }
+    function clueWordsOf(o) { const ids = (storySub("clues")[o.id]) || []; return storyTokens().filter(x => ids.includes(x.id)).map(x => x.tok); }
+    function meanBtns(o, field, fn) {
+      const cur = storySub(field)[o.id];
+      return LEXICON[o.word].meanings.map((m, mi) => `<button type="button" class="m-btn sm ${cur === m.id ? "on" : ""}" style="${cur === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="${fn}('${o.id}','${m.id}')">${SHORT[mi]} ${esc(m.name)}</button>`).join("");
+    }
+    const STORY_STEPS = ["① 처음 짐작", "② 주변 단어 살피기", "③ 단서 견주기", "④ 다시 짐작하고 점검하기"];
+
+    function wordCardHTML(w) {
+      const occ = occsOf(w), n = foundCount(w), checked = storySub("checked")[w];
+      const step = storySub("step")[w] || 0, same = storySub("same")[w], first = storySub("first"), fin = storySub("mean"), keep = storySub("keep");
+      const dots = occ.map(o => storySub("found")[o.id] ? `<span class="dot on" style="background:${WORD_COLORS[w]}"></span>` : `<span class="dot"></span>`).join("");
+      const isOpen = S().open === w;
+      let body = "";
+      if (n < occ.length) body = `<div class="wl-hint">${n ? "하나 더 있어요. 글에서 찾아보세요." : "글에서 찾아 눌러 보세요."}</div>`;
+      else if (!isOpen) body = `<div class="wl-hint">${checked ? "✅ 점검까지 마쳤어요." : `${STORY_STEPS[step]} 차례예요.`} <b style="color:${WORD_COLORS[w]}">열기 ▾</b></div>`;
+      else {
+        body += `<div class="step-dots">${STORY_STEPS.map((s, i) => `<span class="${i === step ? "now" : i < step ? "done" : ""}">${s}</span>`).join("")}</div>`;
+        if (step === 0) {
+          body += `<div class="wl-step">첫 느낌으로 짐작해요. 두 '${esc(w)}'은(는) 같은 뜻일까?</div>
+            ${occ.map((o, i) => `<div class="snip">${i + 1}. ${snippetHTML(o, false)}</div>`).join("")}
+            <div class="m-pick" style="margin:6px 0">
+              <button type="button" class="m-btn ${same === "same" ? "on" : ""}" style="${same === "same" ? "background:#334155;border-color:#334155" : ""}" onclick="voteSame('${w}','same')">같은 뜻 같아요</button>
+              <button type="button" class="m-btn ${same === "diff" ? "on" : ""}" style="${same === "diff" ? "background:#334155;border-color:#334155" : ""}" onclick="voteSame('${w}','diff')">다른 뜻 같아요</button></div>
+            ${same ? `${barChart([{ label: "같은 뜻 같아요", v: "same" }, { label: "다른 뜻 같아요", v: "diff" }], `same:${w}`, "#64748b")}
+              <div class="wl-step" style="margin-top:10px">각각 어떤 뜻 같나요?</div>
+              ${occ.map((o, i) => `<div class="occ-row"><div class="occ-no">${i + 1}번 '${esc(w)}'</div><div class="m-pick">${meanBtns(o, "first", "setFirstMean")}</div></div>`).join("")}
+              ${occ.every(o => first[o.id]) ? `<button type="button" class="big-btn" style="margin-top:6px" onclick="setStoryStep('${w}',1)">다음: 주변 단어 살피기 →</button>` : ""}` : ""}`;
+        }
+        if (step === 1) {
+          body += `<div class="wl-step">두 '${esc(w)}'의 주변 단어 중에서, 뜻을 알려 주는 말을 눌러 밑줄을 그어요.</div>
+            ${occ.map((o, i) => `<div class="snip clickable">${i + 1}. ${snippetHTML(o, true)}</div>`).join("")}
+            ${occ.every(o => clueWordsOf(o).length) ? `<button type="button" class="big-btn" style="margin-top:6px" onclick="setStoryStep('${w}',2)">다음: 단서 견주기 →</button>` : `<div class="wl-hint">두 문장 모두 밑줄을 하나 이상 그어 보세요.</div>`}`;
+        }
+        if (step === 2) {
+          const cmp = storySub("cmp")[w];
+          body += `<div class="wl-step">밑줄 친 단어를 나란히 놓아 봐요.</div>
+            <div class="cmp-grid">${occ.map((o, i) => `<div class="cmp-col"><div class="occ-no">${i + 1}번 '${esc(w)}' 주변</div>${clueWordsOf(o).map(x => `<span class="cmp-chip">${esc(x)}</span>`).join("")}</div>`).join("")}</div>
+            <div class="wl-step">두 '${esc(w)}'의 주변 단어는?</div>
+            <div class="m-pick">
+              <button type="button" class="m-btn ${cmp === "similar" ? "on" : ""}" style="${cmp === "similar" ? "background:#334155;border-color:#334155" : ""}" onclick="setCmp('${w}','similar')">비슷해요</button>
+              <button type="button" class="m-btn ${cmp === "different" ? "on" : ""}" style="${cmp === "different" ? "background:#334155;border-color:#334155" : ""}" onclick="setCmp('${w}','different')">서로 달라요</button></div>
+            ${cmp ? `<button type="button" class="big-btn" style="margin-top:8px" onclick="setStoryStep('${w}',3)">다음: 다시 짐작하고 점검하기 →</button>` : ""}`;
+        }
+        if (step === 3) {
+          body += `<div class="wl-step">밑줄 친 단어를 근거로 다시 짐작해요. 처음 짐작을 그대로 둘까요, 고칠까요?</div>
+            ${occ.map((o, i) => {
+              const k = keep[o.id], finalId = k === "keep" ? first[o.id] : fin[o.id];
+              return `<div class="occ-row">
+                <div class="snip">${i + 1}. ${snippetHTML(o, false)}</div>
+                <div class="q-line" style="margin:4px 0">처음 짐작: ${pill(w, first[o.id])}</div>
+                <div class="m-pick">
+                  <button type="button" class="m-btn sm ${k === "keep" ? "on" : ""}" style="${k === "keep" ? "background:#7c3aed;border-color:#7c3aed" : ""}" onclick="setKeepOcc('${o.id}','keep')">그대로 둘래요</button>
+                  <button type="button" class="m-btn sm ${k === "fix" ? "on" : ""}" style="${k === "fix" ? "background:#7c3aed;border-color:#7c3aed" : ""}" onclick="setKeepOcc('${o.id}','fix')">고칠래요</button>
+                  ${checked && finalId ? `<span class="mark">${finalId === o.answer ? "✅" : "❌"}</span>` : ""}</div>
+                ${k === "fix" ? `<div class="m-pick" style="margin-top:4px">${meanBtns(o, "mean", "setFinalMean")}</div>` : ""}
+              </div>`;
+            }).join("")}
+            <div class="frame-tpl" style="margin-top:6px">${FRAMES[4]}</div>
+            <textarea class="why-input" data-meanwhy="${w}" rows="2" placeholder="처음에는 ○○라고 생각했는데, △△를 읽고 □□로 고쳤다(또는 그대로 두었다).">${esc(storySub("meanWhy")[w] || "")}</textarea>
+            ${occ.every(o => finalOf(o)) ? `<button type="button" class="action-btn" style="margin-top:6px" onclick="checkStoryWord('${w}')">${checked ? "✔ 확인했어요" : "✔ 확인"}</button>` : ""}
+            ${checked && occ.some(o => finalOf(o) !== o.answer) ? `<div class="wl-hint" style="color:#b45309">❌ 표시된 곳은 밑줄 친 단어를 다시 읽고 고쳐 보세요.</div>` : ""}`;
+        }
+        if (step > 0) body += `<button type="button" class="teacher-skip" style="margin-top:8px" onclick="setStoryStep('${w}',${step - 1})">← 앞 단계로</button>`;
+      }
+      return `<div class="wl-card ${n === occ.length && !isOpen ? "closed" : ""}" style="border-color:${n === occ.length ? WORD_COLORS[w] : "var(--border)"}" ${n === occ.length && !isOpen ? `onclick="openWord('${w}')"` : ""}>
+          <div class="wl-head"><span class="wl-word" style="color:${WORD_COLORS[w]}">${esc(w)}</span><span class="dots">${dots}</span></div>
+          ${body}</div>`;
+    }
+
+    function finalOf(o) { const k = storySub("keep")[o.id]; return k === "keep" ? storySub("first")[o.id] : k === "fix" ? storySub("mean")[o.id] : undefined; }
+    function openWord(w) { S().open = w; saveState(); keepScrollRender(); }
+    function voteSame(w, v) { storySub("same")[w] = v; saveState(); sendVote(`same:${w}`, v); keepScrollRender(); }
+    function setFirstMean(occId, id) { storySub("first")[occId] = id; saveState(); keepScrollRender(); }
+    function setStoryStep(w, s) { storySub("step")[w] = s; saveState(); keepScrollRender(); }
+    function toggleStoryClue(occId, tokId) { const c = storySub("clues"); const a = c[occId] || []; c[occId] = a.includes(tokId) ? a.filter(x => x !== tokId) : [...a, tokId]; saveState(); keepScrollRender(); }
+    function setCmp(w, v) { storySub("cmp")[w] = v; saveState(); keepScrollRender(); }
+    function setKeepOcc(occId, v) { storySub("keep")[occId] = v; storySub("checked")[storyTokens().find(x => x.id === occId).word] = false; saveState(); keepScrollRender(); }
+    function setFinalMean(occId, id) { storySub("mean")[occId] = id; storySub("checked")[storyTokens().find(x => x.id === occId).word] = false; saveState(); keepScrollRender(); }
+    function checkStoryWord(w) {
+      storySub("checked")[w] = true;
+      if (occsOf(w).every(o => finalOf(o) === o.answer)) { const next = storyWords().find(x => !storySub("checked")[x] && foundCount(x) === occsOf(x).length); if (next) S().open = next; }
+      saveState(); keepScrollRender();
+    }
+
+    // ④ 점검: 한 문장씩 열고 우리 반 의견 보기 ⑤ 다리 질문
+    function storyCheckHTML() {
+      const c = STORY.check, ck = storySub("chk"), w = c.word, ms = LEXICON[w].meanings;
+      const opts = ms.map((m, mi) => ({ label: `${SHORT[mi]} ${m.name}`, v: m.id, color: MEANING_COLORS[mi] }));
+      const btns = (field, fn) => ms.map((m, mi) => `<button type="button" class="m-btn ${ck[field] === m.id ? "on" : ""}" style="${ck[field] === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="${fn}('${m.id}')">${SHORT[mi]} ${esc(m.name)}</button>`).join("");
+      const finalId = ck.keep === "keep" ? ck.m1 : ck.m2;
+      return `
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">새 문장 점검하기</span>
+            <h2>🔍 이 '${esc(w)}'은(는) 어떤 뜻일까?</h2>
+            <p>문장을 하나씩 열어요. 새 문장을 읽고 생각이 바뀌면 고쳐도 돼요.</p></div></div>
+          <div class="check-card">
+            <div class="q">${STORY.check.s1.split(" ").map(x => x.includes(w) ? `<b class="snip-target" style="--wc:${WORD_COLORS[w]}">${esc(x)}</b>` : esc(x)).join(" ")}</div>
+            <div class="step-title">① 내 생각</div>
+            <div class="m-pick">${btns("m1", "setChk1")}</div>
+            ${ck.m1 ? `<div class="m-pick" style="margin-top:6px">
+                <button type="button" class="m-btn sm ${ck.conf === "half" ? "on" : ""}" style="${ck.conf === "half" ? "background:#64748b;border-color:#64748b" : ""}" onclick="setConf('half')">🤔 반반이에요</button>
+                <button type="button" class="m-btn sm ${ck.conf === "sure" ? "on" : ""}" style="${ck.conf === "sure" ? "background:#64748b;border-color:#64748b" : ""}" onclick="setConf('sure')">🙂 확실해요</button></div>
+              <div class="step-title">우리 반 생각</div>${barChart(opts, "chk1")}` : ""}
+            ${ck.m1 && !ck.open2 ? `<button type="button" class="big-btn" style="margin-top:12px" onclick="openChk2()">다음 문장 열기 →</button>` : ""}
+            ${ck.open2 ? `
+              <div class="q" style="margin-top:14px">➕ ${esc(STORY.check.s2)}</div>
+              <div class="step-title">② 처음 생각을 그대로 둘까, 고칠까?</div>
+              <div class="m-pick" style="margin-bottom:8px">
+                <button type="button" class="big-btn light ${ck.keep === "keep" ? "on" : ""}" onclick="setChkKeep('keep')">그대로 둘래요</button>
+                <button type="button" class="big-btn light ${ck.keep === "fix" ? "on" : ""}" onclick="setChkKeep('fix')">고칠래요</button></div>
+              ${ck.keep === "fix" ? `<div class="m-pick" style="margin-bottom:8px">${btns("m2", "setChk2")}</div>` : ""}
+              ${finalId ? `<div class="step-title">우리 반 생각 (새 문장을 읽은 뒤)</div>${barChart(opts, "chk2")}
+                <textarea class="why-input" data-chkwhy="1" rows="2" style="margin-top:8px" placeholder="${esc(FRAMES[4])}">${esc(ck.why || "")}</textarea>` : ""}` : ""}
+          </div>
+        </section>
+        ${ck.open2 && finalId ? `
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">컴퓨터라면?</span>
+            <h2>🤖 컴퓨터는 이 글의 '연패' 두 개를 처음에 어떻게 볼까?</h2>
+            <p>예측만 해 두세요. 답은 3단계 단어 지도에서 확인해요.</p></div></div>
+          <div class="m-pick">
+            <button type="button" class="big-btn light ${S().predict === "same" ? "on" : ""}" onclick="setPredict('same')">같은 것으로 본다</button>
+            <button type="button" class="big-btn light ${S().predict === "diff" ? "on" : ""}" onclick="setPredict('diff')">다른 뜻으로 나눈다</button>
+          </div>
+        </section>` : ""}`;
+    }
+    function setChk1(id) { const c = storySub("chk"); if (c.open2) return; c.m1 = id; saveState(); sendVote("chk1", id); keepScrollRender(); }
+    function setConf(v) { storySub("chk").conf = v; saveState(); keepScrollRender(); }
+    function openChk2() { storySub("chk").open2 = true; saveState(); keepScrollRender(); }
+    function setChkKeep(v) { const c = storySub("chk"); c.keep = v; if (v === "keep") { c.m2 = c.m1; sendVote("chk2", c.m1); } saveState(); keepScrollRender(); }
+    function setChk2(id) { const c = storySub("chk"); c.m2 = id; saveState(); sendVote("chk2", id); keepScrollRender(); }
+    function setPredict(v) { S().predict = v; saveState(); keepScrollRender(); }
+
+    /* ===== 우리 반 투표 (구글 시트로 배포했을 때 모임) ===== */
+    let votes = {};   // votes[질문][답] = 사람 수
+    function classKey() { return `${state.school}|${String(state.studentNo).slice(0, CLASS_KEY_LENGTH)}`; }
+    function myVote(key) {
+      const s = S();
+      if (key.startsWith("same:")) return (s.same || {})[key.slice(5)];
+      if (key === "chk1") return (s.chk || {}).m1;
+      if (key === "chk2") { const c = s.chk || {}; return c.keep === "keep" ? c.m1 : c.m2; }
+    }
+    function voteCounts(key) {
+      if (HAS_SERVER) return votes[key] || {};
+      const v = myVote(key); return v ? { [v]: 1 } : {};
+    }
+    function barChart(opts, key, color) {
+      const counts = voteCounts(key), total = opts.reduce((a, o) => a + (counts[o.v] || 0), 0);
+      return `<div class="vote-chart">${opts.map(o => {
+          const n = counts[o.v] || 0, pctv = total ? Math.round(n / total * 100) : 0;
+          return `<div class="vbar-row"><span class="vbar-label">${esc(o.label)}</span>
+            <span class="vbar-track"><span class="vbar-fill" style="width:${pctv}%; background:${o.color || color || "#64748b"}"></span></span>
+            <span class="vbar-n">${n}명</span></div>`;
+        }).join("")}
+        <div class="vbar-note">${HAS_SERVER ? `우리 반 ${total}명이 답했어요.` : "지금은 내 답만 보여요. 선생님이 시트로 배포하면 우리 반 결과가 모여요."}</div></div>`;
+    }
+    function sendVote(key, value) {
+      if (!HAS_SERVER || !state.studentNo) return;
+      google.script.run.withSuccessHandler(v => { votes = v || {}; if (state.currentStage === 0) keepScrollRender(); })
+        .saveApp3Vote({ school: state.school, no: state.studentNo, classKey: classKey(), key, value });
+    }
+    function loadVotes() {
+      if (!HAS_SERVER || !state.studentNo) return;
+      google.script.run.withSuccessHandler(v => {
+        const changed = JSON.stringify(v || {}) !== JSON.stringify(votes);
+        votes = v || {};
+        const a = document.activeElement;
+        if (changed && state.currentStage === 0 && !(a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT"))) keepScrollRender();
+      }).getApp3Votes(classKey());
+    }
+
+    /* ===== 1단계: 문맥 살피기 ===== */
+    function renderStage1() {
+      const t = state.currentTarget, L = LEXICON[t], f = sub("first", t);
+      const done = L.sentences.filter((s, i) => f[i] && f[i].m).length;
+      return `${headerHTML(1)}${aiCardHTML(1)}${toolsHTML()}
+        <section class="panel">
+          <div class="panel-title"><span>'${esc(t)}'이(가) 든 문장 읽기 (${done}/${L.sentences.length})</span>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-box target"></div> 목표 낱말</div>
+              <div class="legend-item"><div class="legend-box" style="background:#dcfce7;border-color:#16a34a"></div> 내가 고른 단서</div>
+              ${state.showWin ? `<div class="legend-item"><div class="legend-box context"></div> 컴퓨터의 윈도우 (양옆 ${WINDOW}칸)</div>` : ""}
+            </div></div>
+          ${legendHTML(t)}
+          <div class="read-grid">
+            ${L.sentences.map((s, i) => {
+              const mine = f[i] || {}, clues = mine.clues || [], c = contextOf(s.text, t);
+              return `<div class="read-card ${mine.m && clues.length ? "done" : ""}">
+                <div class="no">문장 ${i + 1}</div>
+                <div class="read-text">${c.toks.map((tk, k) => c.tIdx.includes(k) ? `<span class="tok is-target">${esc(tk)}</span>`
+                  : `<span class="tok ${clues.includes(k) ? "is-clue" : ""} ${state.showWin && c.ctxIdx.has(k) ? "in-win" : ""}" onclick="toggleClue(${i}, ${k})">${esc(tk)}</span>`).join(" ")}</div>
+                <div class="read-step">① 단서 말 누르기 ${clues.length ? `<span style="color:#16a34a">(${clues.length}개)</span>` : ""}</div>
+                <div class="read-step">② 내가 생각한 뜻</div>
+                <div class="m-pick">${L.meanings.map((m, mi) => `<button type="button" class="m-btn ${mine.m === m.id ? "on" : ""}" style="${mine.m === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="setFirst(${i}, '${m.id}')">${SHORT[mi]} ${esc(m.name)}</button>`).join("")}</div>
+              </div>`;
+            }).join("")}
+          </div>
+        </section>
+        ${done < L.sentences.length
+          ? `<p class="rule-note" style="margin:-4px 0 16px">문장을 모두 읽고 뜻을 고르면, 컴퓨터는 이 문장을 어떻게 보는지 견주어 볼 수 있어요.</p>`
+          : `<div class="ai-card" style="animation:none">
+              <div class="face">${state.winAsk ? "🤖" : "🤔"}</div>
+              <div class="say">${!state.winAsk
+                ? `여러분은 '${esc(t)}' 앞뒤를 살펴 읽고 뜻을 짐작했어요. 그럼 <b>컴퓨터가 나처럼 주변을 살펴 읽게 하는 장치</b>는 무엇일까요?`
+                : `바로 <b>윈도우</b>예요. 윈도우는 제가 목표 낱말 양옆으로 몇 칸까지 살펴 읽을지 정하는 창문이에요. 이 앱에서는 사람이 <b>양옆 ${WINDOW}칸</b>으로 정해 두었어요.<br>` +
+                  (state.showWin ? winCompare(t) : `여러분은 문장 전체를 읽고 단서를 골랐지요? 내가 고른 단서가 제 윈도우 안에 들어 있을까요?`)}</div>
+              ${!state.winAsk
+                ? `<button type="button" onclick="answerWin()">💡 답 보기</button>`
+                : `<button type="button" onclick="toggleShowWin()">${state.showWin ? "윈도우 숨기기" : "👀 윈도우 보기"}</button>`}
+            </div>`}
+        ${frameHTML(1, "1단계 정리: 사람과 AI 견주기")}
+        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(2)">다음 단계 (문맥 단서 세기) →</button></div>`;
+    }
+    function toggleClue(i, k) { const f = sub("first", state.currentTarget); const c = f[i] || (f[i] = { m: null, clues: [] }); c.clues = c.clues.includes(k) ? c.clues.filter(x => x !== k) : [...c.clues, k].sort((a, b) => a - b); saveState(); keepScrollRender(); }
+    function setFirst(i, id) { const f = sub("first", state.currentTarget); const c = f[i] || (f[i] = { m: null, clues: [] }); c.m = c.m === id ? null : id; saveState(); keepScrollRender(); }
+    function winCompare(t) {
+      const f = state.first[t] || {};
+      let all = 0, inside = 0;
+      LEXICON[t].sentences.forEach((s, i) => { const c = contextOf(s.text, t); ((f[i] && f[i].clues) || []).forEach(k => { all++; if (c.ctxIdx.has(k)) inside++; }); });
+      if (!all) return "파란 밑줄이 제 윈도우예요. 단서 말을 누르면 제 윈도우와 견주어 볼 수 있어요.";
+      return `파란 밑줄이 제 윈도우예요. 내가 고른 단서 <b>${all}개 중 ${inside}개</b>가 제 윈도우 안에 있어요.` + (inside < all ? " 윈도우 밖의 단서는 저는 보지 못해요." : " 모두 제 윈도우 안에 있네요!");
+    }
+    function answerWin() { state.winAsk = true; saveState(); keepScrollRender(); }
+    function toggleShowWin() { state.showWin = !state.showWin; saveState(); keepScrollRender(); }
+
+    /* ===== 2단계: 문맥 단서 세기 ===== */
+    function orderOf(t) {
+      const n = LEXICON[t].sentences.length;
+      const o = state.order[t];
+      if (!Array.isArray(o) || o.length !== n) state.order[t] = [...Array(n).keys()];
+      return state.order[t];
+    }
+
+    function renderStage2() {
+      const t = state.currentTarget, sc = sceneOf(t);
+      const scenes = ["① 문장마다 펼쳐 모으기", "② 덩어리마다 한 줄로 합치기"];
+      return `${headerHTML(2)}${aiCardHTML(2)}${toolsHTML()}
+        <section class="panel">
+          <div class="scene-nav">${scenes.map((s, i) => `<button type="button" class="scene-btn ${sc === i ? "active" : ""}" onclick="setScene(${i})">${s}</button>`).join("")}</div>
+          <div id="s2msg" class="s2-msg"></div>
+          ${sc === 0 ? `<div class="btn-group" style="margin-bottom:10px; flex-wrap:wrap">
+              <button type="button" class="action-btn" onclick="resetRows()">↩️ 처음으로</button></div>` : ""}
+          <div class="s2-wrap" id="s2wrap"><table class="s2" id="s2table"></table></div>
+          ${sc === 1 ? `<div class="btn-group" style="margin:12px 0 0">
+              <button type="button" class="action-btn ${(state.showChain || {})[t] ? "" : "primary"}" onclick="toggleChain()">${(state.showChain || {})[t] ? "📄 문장 숨기기" : "📄 문장 보기"}</button></div>
+            ${(state.showChain || {})[t] ? `<div class="chain-title">🔗는 위 줄과 1이 겹친 옆 말이에요.</div>
+              <div class="s2-wrap"><table class="s2" id="s2chain"></table></div>` : ""}` : ""}
+          <p class="rule-note">숫자는 낱말 양옆 ${WINDOW}칸 안에 그 말이 <b>함께 나온 횟수</b>예요. ★는 내가 1단계에서 고른 단서예요.${sc === 0 ? " ▲▼를 누르거나 ⋮⋮를 끌어 줄을 옮겨요." : ""}</p>
+        </section>
+        ${frameHTML(2, "2단계 정리: 사람과 AI 견주기")}
+        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(3)">다음 단계 (뜻 추론하기) →</button></div>`;
+    }
+
+    function drawS2Table() {
+      const t = state.currentTarget, sc = sceneOf(t), L = LEXICON[t], C = sentCtx(t);
+      const tbl = document.getElementById("s2table"), msg = document.getElementById("s2msg");
+      if (!tbl) return;
+      const clues = myClueWords(t), groups = computeGroups(t);
+      let rows = [];
+      if (sc === 0) rows = orderOf(t).map(i => ({ idx: i, label: `<span class="row-sen">${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span>`, words: C[i], cls: "one" }));
+      if (sc === 1) rows = groups.map((g, gi) => ({ label: `<span class="group-tag" style="background:${GROUP_COLORS[gi]}">${esc(t)} · ${esc(groupLabel(t, gi))}</span> <span class="row-sen">(문장 ${g.map(i => i + 1).join(", ")})</span>`, words: g.flatMap(i => C[i]), cls: "one", color: GROUP_COLORS[gi] }));
+      // 칸 순서: 지금 줄 순서에서 처음 나오는 차례 → 모이면 덩어리 모양이 보인다
+      const cols = []; rows.forEach(r => r.words.forEach(w => { if (!cols.includes(w)) cols.push(w); }));
+      const count = {}; C.forEach(ws => [...new Set(ws)].forEach(w => { count[w] = (count[w] || 0) + 1; }));
+      let html = `<thead><tr><th>${sc === 0 ? "문장 (줄 옮기기)" : "목표 낱말"}</th>${cols.map(c => `<th class="${clues.includes(c) ? "clue-col" : count[c] > 1 ? "shared" : ""}">${clues.includes(c) ? "★" : ""}${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
+      rows.forEach((r, k) => {
+        const v = {}; r.words.forEach(w => { v[w] = (v[w] || 0) + 1; });
+        html += `<tr data-k="${k}" class="${dragK === k ? "dragging" : ""}"><td><div class="row-label">
+          ${sc === 0 ? `<span class="handle" data-k="${k}">⋮⋮</span><span class="mv-box"><button class="mv" onclick="moveRow(${k},-1)">▲</button><button class="mv" onclick="moveRow(${k},1)">▼</button></span>` : ""}${r.label}</div></td>
+          ${cols.map(c => `<td class="${v[c] ? (r.color ? "" : r.cls) : ""}" style="${v[c] && r.color ? `background:${r.color}22;color:${r.color};font-weight:800` : ""}">${v[c] || 0}</td>`).join("")}</tr>`;
+      });
+      tbl.innerHTML = html + "</tbody>";
+      if (msg) {
+        msg.className = "s2-msg";
+        msg.style.display = sc === 0 ? "none" : "";
+        const nWord = ["한", "두", "세", "네", "다섯", "여섯"][groups.length - 1] || groups.length;
+        if (sc === 1) msg.innerHTML = (state.showChain || {})[t]
+          ? `🤖 저는 <b>0과 1 모양이 닮은 줄끼리</b> 모았어요. 뜻이 다른 문장끼리 잘 나뉘었나요?`
+          : `🤖 컴퓨터는 왜 '${esc(t)}'를 <b>${nWord} 덩어리</b>로 나눴을까요? <b>[문장 보기]</b>를 눌러 0과 1 모양을 살펴보세요.`;
+      }
+      drawChainTable();
+    }
+
+    // ② [문장 보기]: 컴퓨터가 모은 순서로 줄을 놓고, 위 줄과 1이 겹친 옆 말이 있으면 🔗 표시
+    function drawChainTable() {
+      const t = state.currentTarget, tbl = document.getElementById("s2chain");
+      if (!tbl) return;
+      const L = LEXICON[t], C = sentCtx(t), order = computeGroups(t).flatMap(g => bestChain(t, g));
+      const cols = []; order.forEach(i => C[i].forEach(w => { if (!cols.includes(w)) cols.push(w); }));
+      let html = `<thead><tr><th>문장</th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
+      order.forEach((i, k) => {
+        const prev = k > 0 ? order[k - 1] : null, link = prev !== null && shareWord(C[prev], C[i]);
+        const sharedW = link ? [...new Set(C[i].filter(w => C[prev].includes(w)))] : [];
+        const v = {}; C[i].forEach(w => { v[w] = (v[w] || 0) + 1; });
+        html += `<tr class="${link ? "link" : k > 0 ? "gap" : ""}"><td>${link ? `<div class="link-tag">🔗 ${sharedW.map(esc).join(", ")}</div>` : ""}<div class="row-label"><span class="row-sen">${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span></div></td>
+          ${cols.map(c => `<td class="${v[c] ? "one" : ""}">${v[c] || 0}</td>`).join("")}</tr>`;
+      });
+      tbl.innerHTML = html + "</tbody>";
+    }
+    // 덩어리 안에서 위아래 줄이 가장 많이 이어지는 순서 (문장 수가 적어 모두 따져 본다)
+    function bestChain(t, g) {
+      const C = sentCtx(t);
+      let best = g, bestLinks = -1;
+      const perm = (arr, used) => {
+        if (arr.length === g.length) {
+          let l = 0; for (let k = 1; k < arr.length; k++) if (shareWord(C[arr[k - 1]], C[arr[k]])) l++;
+          if (l > bestLinks) { bestLinks = l; best = [...arr]; }
+          return;
+        }
+        if (bestLinks === g.length - 1) return;
+        g.forEach(i => { if (!used.has(i)) { used.add(i); arr.push(i); perm(arr, used); arr.pop(); used.delete(i); } });
+      };
+      if (g.length <= 8) perm([], new Set());
+      return best;
+    }
+    function toggleChain() { const s = state.showChain || (state.showChain = {}); s[state.currentTarget] = !s[state.currentTarget]; saveState(); keepScrollRender(); }
+
+    let dragK = null;
+    function bindS2Drag() {
+      const wrap = document.getElementById("s2wrap");
+      if (!wrap) return;
+      wrap.addEventListener("pointerdown", e => {
+        const h = e.target.closest(".handle");
+        if (!h) return;
+        dragK = Number(h.dataset.k);
+        wrap.setPointerCapture(e.pointerId);
+        drawS2Table();
+        e.preventDefault();
+      });
+      wrap.addEventListener("pointermove", e => {
+        if (dragK === null) return;
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const tr = el && el.closest("tr[data-k]");
+        if (!tr) return;
+        const k = Number(tr.dataset.k);
+        if (k !== dragK) { const o = orderOf(state.currentTarget); const [x] = o.splice(dragK, 1); o.splice(k, 0, x); dragK = k; drawS2Table(); }
+      });
+      const end = e => { if (dragK === null) return; dragK = null; try { wrap.releasePointerCapture(e.pointerId); } catch (er) {} saveState(); drawS2Table(); };
+      wrap.addEventListener("pointerup", end);
+      wrap.addEventListener("pointercancel", end);
+    }
+    function moveRow(k, d) { const o = orderOf(state.currentTarget), j = k + d; if (j < 0 || j >= o.length) return; [o[k], o[j]] = [o[j], o[k]]; saveState(); drawS2Table(); }
+    // 처음으로: 문장을 처음 순서(1, 2, 3 …)로 되돌린다
+    function resetRows() { state.order[state.currentTarget] = [...Array(LEXICON[state.currentTarget].sentences.length).keys()]; saveState(); drawS2Table(); }
+    function setScene(i) { state.scene[state.currentTarget] = i; saveState(); keepScrollRender(); }
+    // 장면 번호 (예전 '한 줄로 세기'를 뺀 뒤): 0 펼쳐 모으기 · 1 합치기
+    function sceneOf(t) { const v = state.sceneV2 ? state.scene[t] : (state.scene[t] === 2 ? 1 : 0); return v === 1 ? 1 : 0; }
+
+    /* ===== 3·4단계: 단어 지도, 이름표, 점검 ===== */
+    function chipW(text, px) { return text.length * px + 40; }
+    function allContextWords(t) { const ws = []; sentCtx(t).forEach(c => c.forEach(w => { if (!ws.includes(w)) ws.push(w); })); return ws; }
+
+    let lastMapW = 900;
+    function isNarrow(W) { return W < 640; }
+    // 덩어리 자리: 넓은 화면은 가로로, 좁은 화면(휴대폰)은 세로로 늘어놓는다
+    function groupCenters(t, W) {
+      const k = computeGroups(t).length;
+      if (isNarrow(W)) { const band = 76 / k; return computeGroups(t).map((g, gi) => ({ cx: 50, cy: band * gi + band / 2 + 3, tagY: band * gi + 1, rx: [16, 40], ry: [band * 0.2, band * 0.36] })); }
+      return computeGroups(t).map((g, gi) => ({ cx: k === 1 ? 50 : 16 + gi * (68 / (k - 1)), cy: 34, tagY: 3, rx: [7, k === 3 ? 13 : 17], ry: [10, 24] }));
+    }
+    function computeMap(t, W, H, mode) {
+      const L = LEXICON[t], C = sentCtx(t), groups = computeGroups(t), words = allContextWords(t), narrow = isNarrow(W);
+      const out = {}, items = [];
+      const add = (key, x, y, w, pinned, hide) => { out[key] = { x: x - (w / W * 100) / 2, y, hide: !!hide }; if (!hide) items.push({ key, w: w / W * 100, pinned }); };
+      const gc = groupCenters(t, W);
+      const fs = narrow ? { big: 20, occ: 13, ctx: 11, tag: 13 } : { big: 22, occ: 14, ctx: 12, tag: 15 };
+      if (mode === "one") {
+        add("big", 50, narrow ? 37 : 34, chipW(t, fs.big), true);
+        words.forEach((w, i) => { const a = (i / words.length) * Math.PI * 2; add("c:" + w, 50 + Math.cos(a) * (narrow ? 36 : 38), (narrow ? 37 : 34) + Math.sin(a) * (narrow ? 33 : 28), chipW(w, fs.ctx), false); });
+        L.sentences.forEach((s, i) => add("o:" + i, 50, 34, chipW(t + "·9", fs.occ), false, true));
+        groups.forEach((g, gi) => add("g:" + gi, gc[gi].cx, gc[gi].tagY, chipW(groupLabel(t, gi), fs.tag), false, true));
+      } else {
+        add("big", 50, 34, chipW(t, fs.big), false, true);
+        groups.forEach((g, gi) => {
+          const { cx, cy, tagY, rx, ry } = gc[gi];
+          add("g:" + gi, cx, tagY, chipW(groupLabel(t, gi), fs.tag), true);
+          g.forEach((i, j) => { const a = (j / g.length) * Math.PI * 2 - Math.PI / 2; add("o:" + i, cx + Math.cos(a) * rx[0], cy + Math.sin(a) * ry[0], chipW(t + "·9", fs.occ), false); });
+          const gw = []; g.forEach(i => C[i].forEach(w => { if (!gw.includes(w)) gw.push(w); }));
+          gw.forEach((w, j) => { if (out["c:" + w]) return; const a = (j / gw.length) * Math.PI * 2; add("c:" + w, cx + Math.cos(a) * rx[1], cy + Math.sin(a) * ry[1], chipW(w, fs.ctx), false); });
+        });
+      }
+      // 겹친 칩 떼어 놓기
+      const chipH = ((narrow ? 34 : 40) / H) * 100;
+      for (let it = 0; it < 300; it++) {
+        let moved = false;
+        for (let a = 0; a < items.length; a++) for (let b = a + 1; b < items.length; b++) {
+          const A = items[a], B = items[b], p = out[A.key], q = out[B.key];
+          const ox = (A.w + B.w) / 2 + 0.8 - Math.abs((p.x + A.w / 2) - (q.x + B.w / 2));
+          const oy = chipH + 1 - Math.abs(p.y - q.y);
+          if (ox > 0 && oy > 0) {
+            if (A.pinned && B.pinned) continue;
+            moved = true;
+            const ka = A.pinned ? 0 : B.pinned ? 1 : 0.5, kb = B.pinned ? 0 : A.pinned ? 1 : 0.5;
+            if (oy < ox) { const d = (p.y <= q.y ? -1 : 1) * oy; p.y += d * ka; q.y -= d * kb; }
+            else { const d = ((p.x + A.w / 2) <= (q.x + B.w / 2) ? -1 : 1) * ox; p.x += d * ka; q.x -= d * kb; }
+          }
+        }
+        items.forEach(itm => { const p = out[itm.key]; p.x = Math.max(0.5, Math.min(99.5 - itm.w, p.x)); p.y = Math.max(1, Math.min(76, p.y)); });
+        if (!moved) break;
+      }
+      return out;
+    }
+
+    function renderStage3() {
+      const t = state.currentTarget, L = LEXICON[t], groups = computeGroups(t), split = !!state.split[t];
+      const names = sub("names", t), allNamed = groups.every((g, gi) => names[gi]);
+      const colors = ['#ef4444', '#2563eb', '#16a34a', '#000000', '#eab308', '#8b5cf6'];
+      const pos = state.chipPositions[t] || computeMap(t, lastMapW, 580, split ? "split" : "one");
+      const f = state.first[t] || {};
+      return `${headerHTML(3)}${aiCardHTML(3)}${toolsHTML()}
+        <section class="stage2-right" style="margin-bottom:16px">
+          <div class="stage2-right-header">
+            <div><h2>'${esc(t)}' 단어 지도</h2>
+              <p>노란 칩은 '${esc(t)}', 파란 칩은 옆에 나온 말이에요. 칩은 언제나 옮길 수 있고, '펜 쓰기'를 켜면 지도 위에 쓸 수 있어요.</p></div>
+            <div class="btn-group">
+              ${split ? `<button type="button" class="action-btn" onclick="setSplit(false)">↩️ 한 낱말로 되돌리기</button>`
+                : `<button type="button" class="action-btn primary" onclick="setSplit(true)">✂️ 옆 말로 나누기</button>`}
+            </div>
+          </div>
+          <div class="ai-say">${mapSay(t)}</div>
+          <div class="drawing-toolbar">
+            <button type="button" class="tool-btn ${drawTool === 'pen' ? 'active' : ''}" onclick="togglePenMode('pen')">✏️ 펜 쓰기 ${drawTool === 'pen' ? '(켜짐)' : ''}</button>
+            <button type="button" class="tool-btn ${drawTool === 'eraser' ? 'active' : ''}" onclick="togglePenMode('eraser')">🧹 지우개</button>
+            <div class="color-picker-wrapper" style="margin-left: 6px;"><span style="font-size: 12px; font-weight:700; color:#64748b;">색상:</span>
+              ${colors.map(c => `<span class="color-dot ${drawColor === c && drawTool === 'pen' ? 'active' : ''}" style="background-color: ${c};" onclick="setPenColor('${c}')"></span>`).join("")}</div>
+            <div style="display:inline-flex; align-items:center; gap:4px; margin-left:6px;"><span style="font-size:12px; font-weight:700; color:#64748b;">두께:</span>
+              <button type="button" class="tool-btn ${drawSize === 2 ? 'active' : ''}" onclick="setPenSize(2)" style="padding: 4px 8px; font-size:12px;">얇게</button>
+              <button type="button" class="tool-btn ${drawSize === 5 ? 'active' : ''}" onclick="setPenSize(5)" style="padding: 4px 8px; font-size:12px;">보통</button>
+              <button type="button" class="tool-btn ${drawSize === 10 ? 'active' : ''}" onclick="setPenSize(10)" style="padding: 4px 8px; font-size:12px;">두껍게</button></div>
+            <button type="button" class="tool-btn" onclick="clearStage2Canvas()" style="margin-left:auto; color:#dc2626; border-color:#fca5a5; padding: 4px 10px; font-size:12px;">🗑️ 필기 지우기</button>
+          </div>
+          <div class="stage2-workspace-container">
+            <div id="chipWorkspace" class="chip-workspace">
+              ${split ? `<div class="unknown-zone"><span>❓ 어느 쪽인지 모르는 곳</span></div>` : ""}
+              <canvas id="stage2DrawingCanvas" class="drawing-canvas ${drawTool !== 'off' ? 'canvas-active' : ''}"></canvas>
+              ${chipHTML("big", `${esc(t)}`, "big", pos)}
+              ${groups.map((g, gi) => chipHTML("g:" + gi, esc(groupLabel(t, gi)), "tag", pos, `background:${GROUP_COLORS[gi]}`)).join("")}
+              ${L.sentences.map((s, i) => chipHTML("o:" + i, `${esc(t)}<small style="opacity:.7">·${i + 1}</small>`, "occ", pos, `border-color:${GROUP_COLORS[groupOf(t, i)]}`, s.text)).join("")}
+              ${allContextWords(t).map(w => chipHTML("c:" + w, esc(w), "ctx", pos)).join("")}
+            </div>
+          </div>
+        </section>
+
+        ${split ? `
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">3단계 뜻 추론하기</span>
+            <h2>🏷️ 덩어리마다 뜻 이름표를 붙여요</h2></div></div>
+          <div class="group-grid">
+            ${groups.map((g, gi) => `
+              <div class="group-card" style="border-color:${GROUP_COLORS[gi]}">
+                <h4><span class="group-tag" style="background:${GROUP_COLORS[gi]}">덩어리 ${GROUP_NAMES[gi]}</span> 문장 ${g.length}개</h4>
+                <ul>${g.map(i => `<li><span>${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span>${(f[i] && f[i].m) ? pill(t, f[i].m) : `<span class="mini-pill none">내 뜻 없음</span>`}</li>`).join("")}</ul>
+                <div class="m-pick">${L.meanings.map((m, mi) => `<button type="button" class="m-btn ${names[gi] === m.id ? "on" : ""}" style="${names[gi] === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="setName(${gi}, '${m.id}')">${SHORT[mi]} ${esc(m.name)}</button>`).join("")}</div>
+              </div>`).join("")}
+          </div>
+          ${allNamed ? `<div class="ai-say" style="margin-top:14px">🤖 사람이 표의 숫자를 보고 ${groups.map((g, gi) => `'<b>${esc(meaningInfo(t, names[gi]).name)}</b>'`).join("이라는 뜻과 ")}이라는 뜻으로 이름표를 붙여 줬어요. 앞으로 저는 숫자가 어느 쪽과 비슷한지에 따라 '${esc(t)}'을(를) 나눠서 읽을 거예요. 하지만 저는 그 뜻을 알지는 못해요.</div>` : ""}
+        </section>
+        ${frameHTML(3, "3단계 정리: 사람과 AI 견주기")}` : ""}
+        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(4)">다음 단계 (추론 점검·수정하기) →</button></div>`;
+    }
+
+    function chipHTML(key, inner, cls, pos, style, title) {
+      const p = pos[key] || { x: 50, y: 40, hide: true };
+      return `<div class="word-chip ${cls} ${p.hide ? "hide" : ""}" data-chip="${key}" ${title ? `title="${esc(title)}"` : ""} style="left:${p.x}%; top:${p.y}%; ${style || ""}">${inner}</div>`;
+    }
+
+    function mapSay(t) {
+      const groups = computeGroups(t);
+      const pred = state.story.predict && t === STORY.check.word ? `📖 글 읽기에서 나는 컴퓨터가 '연패' 두 개를 <b>${state.story.predict === "same" ? "같은 것으로 본다" : "다른 뜻으로 나눈다"}</b>고 예측했어요.<br>` : "";
+      if (!state.split[t]) return pred + `🤖 저는 처음에 '${esc(t)}'이(가) 모두 <b>같은 뜻</b>인 줄 알았어요. 그래서 옆에 나온 말들이 '${esc(t)}' 하나에 모두 붙어 있어요. 이 말들이 정말 한 가지 뜻의 단서일까요?`;
+      return `🤖 옆에 같은 말이 나온 문장끼리 모았더니 '${esc(t)}'이(가) <b>덩어리 ${groups.length}개</b>로 나뉘었어요. 각 덩어리 옆에는 서로 다른 말들이 모여 있어요.`;
+    }
+
+    function setSplit(v) {
+      const t = state.currentTarget;
+      state.split[t] = v;
+      saveState();
+      const ws = document.getElementById("chipWorkspace");
+      const rect = ws ? ws.getBoundingClientRect() : { width: 900, height: 580 };
+      const from = state.chipPositions[t] || computeMap(t, rect.width, rect.height, v ? "one" : "split");
+      state.chipPositions[t] = from;
+      keepScrollRender();
+      setTimeout(() => animateTo(computeMap(t, rect.width, rect.height, v ? "split" : "one")), 60);
+    }
+
+    function animateTo(target) {
+      const t = state.currentTarget;
+      const keep = state.chipPositions[t] && state.chipPositions[t].new;
+      state.chipPositions[t] = { ...target };
+      if (keep) state.chipPositions[t].new = keep;
+      saveState();
+      document.querySelectorAll("#chipWorkspace .word-chip").forEach(chip => {
+        const p = target[chip.dataset.chip];
+        if (!p) return;
+        chip.classList.add("animate");
+        chip.classList.toggle("hide", !!p.hide);
+        chip.style.left = p.x + "%";
+        chip.style.top = p.y + "%";
+        setTimeout(() => chip.classList.remove("animate"), 1000);
+      });
+    }
+
+    function setName(gi, id) {
+      const t = state.currentTarget, n = sub("names", t);
+      n[gi] = n[gi] === id ? undefined : id;
+      saveState();
+      keepScrollRender();
+      const ws = document.getElementById("chipWorkspace");
+      if (ws) { const r = ws.getBoundingClientRect(); const m = computeMap(t, r.width, r.height, "split"); animateTo({ ...state.chipPositions[t], ["g:" + gi]: m["g:" + gi] }); }
+    }
+
+    // 받침에 따라 조사 고르기: josa('입장', '을', '를') → '을'
+    function josa(word, a, b) { const c = String(word || "").slice(-1).charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return b; return (c - 0xAC00) % 28 ? a : b; }
+
+    /* ----- 4단계 컴퓨터 가르치기 -----
+       1~3단계와 따로, 문제마다 정해 둔 '가상의 학습 결과(learned)'에서 출발한다.
+       학생이 넣은 문장은 고른 뜻 쪽에 옆 말 1번으로 더해진다. */
+    const TEACH_MAX = 3, TEACH_WORDS = 4;
+    function teachOf(t) { const c = state.teach[t] || (state.teach[t] = {}); if (!c.items) { c.items = {}; c.cur = 0; } return c; }
+    function teachItem(t, i) { const c = teachOf(t); const it = c.items[i] || (c.items[i] = {}); if (!Array.isArray(it.adds)) it.adds = []; return it; }
+    // 가상 학습 결과 읽기: "행사=4/0; 없는=0/2" → { 행사: { A: 4, B: 0 }, 없는: { A: 0, B: 2 } }
+    function learnedOf(t, ck) {
+      const ids = LEXICON[t].meanings.map(m => m.id), out = {};
+      String(ck.learned || "").split(/[;\n]/).forEach(part => {
+        const [w, nums] = part.split("="); if (!w || !nums) return;
+        const ns = nums.split("/").map(x => Number(x) || 0); out[w.trim()] = {}; ids.forEach((id, i) => { out[w.trim()][id] = ns[i] || 0; });
+      });
+      return out;
+    }
+    function teachScores(t, ck, adds) {
+      const ctx = contextOf(ck.text, t).ctx, learned = learnedOf(t, ck), sc = {};
+      LEXICON[t].meanings.forEach(m => { sc[m.id] = 0; });
+      [...new Set(ctx)].forEach(w => { const l = learned[w]; if (l) Object.keys(sc).forEach(id => { sc[id] += l[id] || 0; }); });
+      (adds || []).forEach(a => { if (sc[a.m] == null) return; const ca = contextOf(a.text, t).ctx; ctx.forEach(w => { sc[a.m] += ca.filter(y => y === w).length; }); });
+      const total = Object.values(sc).reduce((x, y) => x + y, 0), ids = Object.keys(sc);
+      const pct = {}; ids.forEach(id => { pct[id] = total ? Math.round(sc[id] / total * 100) : Math.round(100 / ids.length); });
+      const max = Math.max(...ids.map(id => sc[id])), tops = ids.filter(id => sc[id] === max);
+      return { sc, pct, total, pick: total && tops.length === 1 ? tops[0] : null, ctx };
+    }
+    // 판단 근거: 고른 뜻 쪽에서 센 옆 말
+    function teachHits(t, ck, adds, m) {
+      const ctx = contextOf(ck.text, t).ctx, learned = learnedOf(t, ck), hit = new Set();
+      ctx.forEach(w => { if (learned[w] && learned[w][m] > 0) hit.add(w); });
+      (adds || []).forEach(a => { if (a.m !== m) return; const ca = contextOf(a.text, t).ctx; ctx.forEach(w => { if (ca.includes(w)) hit.add(w); }); });
+      return [...hit];
+    }
+    function mLabel(t, id) { const mi = meaningInfo(t, id); return mi ? `${mi.short} ${mi.name}` : ""; }
+
+    function renderStage4() {
+      const t = state.currentTarget, L = LEXICON[t], c = teachOf(t), n = L.checks.length, cur = Math.min(c.cur || 0, n - 1);
+      const s = L.checks[cur], it = teachItem(t, cur), r = teachScores(t, s, it.adds), right = r.pick === s.m;
+      const left = TEACH_MAX - it.adds.length, done = right || left <= 0;
+      const basis = r.pick ? teachHits(t, s, it.adds, r.pick) : [];
+      const bars = L.meanings.map((m, mi) => `<div class="pbar-row"><span class="pbar-label">${SHORT[mi]} ${esc(m.name)}</span>
+          <span class="pbar-track"><span class="pbar-fill" style="width:${r.pct[m.id]}%; background:${MEANING_COLORS[mi]}"></span></span>
+          <span class="pbar-n">${r.pct[m.id]}%</span></div>`).join("");
+      const ch = it.choice, locked = it.adds.length > 0;
+      const ok = i => { const x = L.checks[i], ti = teachItem(t, i); return ti.adds.length && teachScores(t, x, ti.adds).pick === x.m; };
+      return `${headerHTML(4)}${toolsHTML()}
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">4단계 추론 점검·수정하기</span>
+            <h2>컴퓨터 가르치기</h2></div></div>
+          <div class="duel-dots">${L.checks.map((x, i) => `<button type="button" class="duel-dot ${i === cur ? "now" : ""}" onclick="teachGo(${i})">문제 ${i + 1}${ok(i) ? " ⭕" : ""}</button>`).join("")}</div>
+          <div class="check-card">
+            <div class="q-lead">다음은 학습을 마친 컴퓨터가 아래 문장의 '${esc(t)}'를 어떤 뜻으로 판단했는지 나타낸 것입니다.</div>
+            <div class="q-data">
+              <div><span class="q-key">문장</span> ${sentHTML(t, s.text)}</div>
+              <div><span class="q-key">컴퓨터의 판단</span> ${r.pick ? `${esc(mLabel(t, r.pick))} ${r.pct[r.pick]}%` : "판단할 수 없음"}</div>
+              <div class="pbars">${bars}</div>
+              <div><span class="q-key">판단 근거(옆 말)</span> ${basis.length ? basis.map(esc).join(", ") : "없음"}</div>
+            </div>
+            <div class="q-ask">'${esc(s.text)}'에서 '${esc(t)}'의 뜻을 고르세요.</div>
+            <div class="m-pick">${L.meanings.map((m, mi) => `<button type="button" class="m-btn ${ch === m.id ? "on" : ""}" style="${ch === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="teachChoose('${m.id}')" ${locked && ch !== m.id ? "disabled" : ""}>${SHORT[mi]} ${esc(m.name)}</button>`).join("")}</div>
+            ${it.adds.length ? `<div class="add-list">${it.adds.map(a => `<div class="add-item">넣은 문장: ${sentHTML(t, a.text)} ${pill(t, a.m)}</div>`).join("")}</div>` : ""}
+            ${it.say ? `<div class="q-result ${right && it.adds.length ? "ok" : ""}">${esc(it.say)}</div>` : ""}
+            ${done ? `
+              <div class="teach-end">${right ? (it.adds.length ? "⭕ 컴퓨터의 판단이 바뀌었습니다." : "⭕ 컴퓨터가 이미 바르게 판단했습니다.") : `❌ ${TEACH_MAX}번 안에 판단을 바꾸지 못했습니다.`}</div>
+              ${right ? "" : `<button type="button" class="big-btn light" style="margin-top:10px" onclick="teachReset()">다시 하기</button>`}
+              ${cur < n - 1 ? `<button type="button" class="big-btn" style="margin-top:10px" onclick="teachGo(${cur + 1})">다음 문제 →</button>` : ""}`
+            : ch ? `
+              <div class="q-ask">컴퓨터가 '${esc(t)}'의 뜻을 바르게 판단하도록, '${esc(t)}'가 든 문장을 넣으세요. <span class="left-n">(${TEACH_WORDS}어절 이내, 남은 횟수 ${left}번)</span></div>
+              <input class="teach-input" id="teachInput" type="text" placeholder="${TEACH_WORDS}어절 이내" value="${esc(it.draft || "")}" onkeydown="if(event.key==='Enter')teachAdd()">
+              <button type="button" class="big-btn" style="margin-top:10px" onclick="teachAdd()">넣기</button>
+              <div class="teach-err">${esc(teachErr)}</div>` : ""}
+          </div>
+        </section>
+        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(5)">마무리 →</button></div>`;
+    }
+    let teachErr = "";
+    function teachReset() { const it = curTeach(); it.adds = []; it.say = ""; it.draft = ""; it.choice = null; teachErr = ""; saveState(); keepScrollRender(); }
+    function curTeach() { const t = state.currentTarget; return teachItem(t, Math.min(teachOf(t).cur || 0, LEXICON[t].checks.length - 1)); }
+    function teachGo(i) { teachOf(state.currentTarget).cur = i; teachErr = ""; saveState(); keepScrollRender(); }
+    // 문제 문장의 뜻을 고르면, 그 뜻이 학생이 넣는 문장의 이름표가 된다 (넣기 시작하면 바꿀 수 없음, '다시 하기'로 초기화)
+    function teachChoose(id) { const it = curTeach(); if (it.adds.length) return; const el = document.getElementById("teachInput"); if (el) it.draft = el.value; it.choice = it.choice === id ? null : id; teachErr = ""; saveState(); keepScrollRender(); }
+    function teachAdd() {
+      const t = state.currentTarget, c = teachOf(t), i = Math.min(c.cur || 0, LEXICON[t].checks.length - 1), s = LEXICON[t].checks[i], it = teachItem(t, i);
+      const el = document.getElementById("teachInput"), text = tokensOf(el ? el.value : "").join(" ");
+      const err = m => { teachErr = m; if (el) it.draft = el.value; keepScrollRender(); };
+      if (it.adds.length >= TEACH_MAX) return;
+      if (!text) return err("문장을 쓰세요.");
+      if (tokensOf(text).length > TEACH_WORDS) return err(`${TEACH_WORDS}어절 이내로 쓰세요.`);
+      if (!contextOf(text, t).tIdx.length) return err(`'${t}'를 띄어 써서 넣으세요.`);
+      if (!contextOf(text, t).ctx.length) return err("옆 말을 함께 쓰세요.");
+      if (text === tokensOf(s.text).join(" ")) return err("문제 문장과 다르게 쓰세요.");
+      if (it.adds.some(a => a.text === text)) return err("이미 넣은 문장입니다.");
+      if (!it.choice) return err("뜻을 고르세요.");
+      const before = teachScores(t, s, it.adds);
+      it.adds.push({ text, m: it.choice });
+      const after = teachScores(t, s, it.adds);
+      const changed = Object.keys(after.sc).some(k => after.sc[k] !== before.sc[k]);
+      const pctLine = L => LEXICON[t].meanings.map((m, mi) => `${SHORT[mi]} ${after.pct[m.id]}%`).join(" : ");
+      if (!changed) it.say = "판단이 바뀌지 않았습니다. (넣은 문장에 판단 근거가 된 옆 말이 없습니다.)";
+      else if (!after.pick) it.say = `판단할 수 없습니다. (${pctLine()})`;
+      else if (after.pick !== before.pick) it.say = `판단이 바뀌었습니다. ${mLabel(t, after.pick)} ${after.pct[after.pick]}%`;
+      else it.say = `판단이 바뀌지 않았습니다. ${mLabel(t, after.pick)} ${after.pct[after.pick]}%`;
+      it.draft = ""; teachErr = "";
+      saveState(); keepScrollRender();
+    }
+
+    /* ===== 🧭 마무리 ===== */
+    function renderStage5() {
+      return `${headerHTML(5)}
+        ${returnHTML()}
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">사람이 정한 것 돌아보기</span>
+            <h2>👥 컴퓨터가 뜻을 나누기까지, 사람이 정한 것은?</h2>
+            <p>사람이 정한 것이라고 생각하면 눌러 표시해요.</p></div></div>
+          <div class="human-list">${HUMAN_DECISIONS.map((h, i) => `<span class="human-item ${state.human[i] ? "on" : ""}" onclick="toggleHuman(${i})">${state.human[i] ? "✅" : "⬜"} ${h}</span>`).join("")}</div>
+          <div class="class-summary">컴퓨터는 처음에 같은 낱말을 한 뜻으로 보았다가, 0과 1 모양이 닮은 줄끼리 모아 뜻을 나누었어요.<br>
+            사람은 옆 말과 낱말의 뜻, 내 경험을 함께 생각해서 뜻을 가려내요. 나는 낱말의 뜻과 경험까지 함께 읽어요. 이것이 <b>문맥 추론</b>이에요.<br>
+            컴퓨터는 같은 말을 찾아 셀 뿐, 뜻을 알지는 못해요. 그리고 뜻 이름표를 붙인 것은 <b>사람</b>이에요.</div>
+        </section>
+        ${wrapHTML()}`;
+    }
+    function saveRowHTML() {
+      return `
+          <div class="save-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px">
+            <button type="button" class="class-submit" style="flex:0 0 auto; padding:0 20px" onclick="sendRecords()">📨 내 생각 보내기</button>
+            <span class="rule-note" style="margin:0">${esc(saveMsg)}</span>
+          </div>`;
+    }
+
+    /* ===== 마무리: 나의 읽기 순서 ===== */
+    // 사람의 읽기 순서 (모형 2단계 '문맥 단서 세기'는 컴퓨터의 방법이라 넣지 않음)
+    const WRAP_STEPS = [
+      { k: 1, name: "문맥 살피기", say: "낱말 앞뒤를 살펴 읽어요" },
+      { k: 2, name: "뜻 추론하기", say: "단서로 뜻을 짐작해요" },
+      { k: 3, name: "추론 점검·수정하기", say: "새 문장을 읽고 짐작을 고치거나 그대로 둬요" }
+    ];
+    const WRAP_SHUFFLE = [2, 3, 1];
+    function W() { const w = state.wrap; if (!Array.isArray(w.order) || w.order.some(k => !WRAP_STEPS.find(s => s.k === k)) || w.v !== 3) { w.order = []; w.checked = false; w.v = 3; } return w; }
+    function wrapStep(k) { return WRAP_STEPS.find(s => s.k === k); }
+    function wrapAllRight() { const w = W(); return w.order.length === WRAP_STEPS.length && w.order.every((k, i) => k === i + 1); }
+    function wrapHTML() {
+      const w = W(), done = w.checked && wrapAllRight();
+      return `
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">마무리</span>
+            <h2>🧭 나의 읽기 순서</h2>
+            <p>뜻을 모르는 낱말을 만나면 어떤 순서로 읽을까요? 차례대로 눌러 칸을 채워요.</p></div></div>
+          <div class="wrap-slots">${WRAP_STEPS.map((_, i) => {
+            const k = w.order[i], s = k ? wrapStep(k) : null, mark = w.checked && k ? (k === i + 1 ? "⭕" : "❌") : "";
+            return `<div class="wrap-slot ${s ? "filled" : ""}" ${s && !done ? `onclick="wrapRemove(${i})"` : ""}>
+              <span class="wrap-no">${i + 1}</span>${s ? `<span class="wrap-name">${esc(s.name)}</span><span class="wrap-say">${esc(s.say)}</span>` : `<span class="wrap-empty">?</span>`}
+              ${mark ? `<span class="wrap-mark">${mark}</span>` : ""}</div>`;
+          }).join("")}</div>
+          ${done ? "" : `<div class="wrap-pool">${WRAP_SHUFFLE.filter(k => !w.order.includes(k)).map(k => `<button type="button" class="wrap-card" onclick="wrapAdd(${k})"><b>${esc(wrapStep(k).name)}</b><span>${esc(wrapStep(k).say)}</span></button>`).join("")}</div>`}
+          ${w.order.length === WRAP_STEPS.length && !done ? `<button type="button" class="big-btn" style="margin-top:10px" onclick="wrapCheck()">✔ 확인</button>` : ""}
+          ${w.checked && !done ? `<div class="wrap-hint">❌ 칸을 눌러 빼고 다시 넣어 보세요.</div>` : ""}
+          ${done ? `
+            <div class="step-title" style="margin-top:14px; font-size:17px">✍️ 다음에 뜻을 모르는 낱말을 만나면, 나는 이렇게 읽을래요.</div>
+            <textarea class="why-input" id="wrapLine" data-wrapline="1" rows="2" placeholder="한 줄로 써 보세요.">${esc(w.line || "")}</textarea>` : ""}
+          ${saveRowHTML()}
+        </section>`;
+    }
+    function wrapAdd(k) { const w = W(); if (w.order.length >= WRAP_STEPS.length || w.order.includes(k)) return; w.order.push(k); w.checked = false; saveState(); keepScrollRender(); }
+    function wrapRemove(i) { const w = W(); w.order.splice(i, 1); w.checked = false; saveState(); keepScrollRender(); }
+    function wrapCheck() { W().checked = true; saveState(); keepScrollRender(); }
+
+    /* ===== 마지막: 다시 읽는 〈속상했던 주말〉 (학생이 혼자) ===== */
+    function R() { return state.story.back || (state.story.back = {}); }
+    function rsub(k) { const r = R(); return r[k] || (r[k] = {}); }
+    function returnHTML() {
+      const w = STORY.check.word, occ = occsOf(w), r = R(), clues = rsub("clues"), mean = rsub("mean"), first = state.story.first || {};
+      const allMeant = occ.every(o => mean[o.id]);
+      const tokHTML = o => sentenceOf(o).map(x => x.id === o.id ? `<span class="snip-target" style="--wc:${WORD_COLORS[w]}">${esc(x.tok)}</span>`
+        : `<span class="snip-tok ${(clues[o.id] || []).includes(x.id) ? "is-clue" : ""}" onclick="toggleBackClue('${o.id}','${x.id}')">${esc(x.tok)}</span>`).join(" ");
+      return `
+        <section class="class-panel">
+          <div class="class-head"><div>
+            <span class="class-badge">글로 돌아가기</span>
+            <h2>📖 다시 읽는 〈${esc(STORY.title)}〉</h2>
+            <p>처음 읽었던 글의 두 '${esc(w)}'을(를) 이번에는 오늘 배운 방법으로 다시 읽어요.</p></div></div>
+          <div class="step-title">① 주변 단어 다시 살피기 — 뜻을 알려 주는 말을 눌러 밑줄을 그어요</div>
+          ${occ.map((o, i) => `<div class="snip clickable" style="font-size:16px">${i + 1}. ${tokHTML(o)}</div>`).join("")}
+          ${occ.every(o => (clues[o.id] || []).length) ? `
+            <div class="step-title">② 뜻 다시 짐작하기</div>
+            ${occ.map((o, i) => `<div class="occ-row"><div class="occ-no">${i + 1}번 '${esc(w)}' · 글 읽기 때 처음 짐작: ${pill(w, first[o.id])}</div>
+              <div class="m-pick">${LEXICON[w].meanings.map((m, mi) => `<button type="button" class="m-btn sm ${mean[o.id] === m.id ? "on" : ""}" style="${mean[o.id] === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="setBackMean('${o.id}','${m.id}')">${SHORT[mi]} ${esc(m.name)}</button>`).join("")}</div></div>`).join("")}` : ""}
+          ${allMeant ? `
+            <div class="step-title">③ 설명하기</div>
+            <div class="frame-tpl">'${esc(w)}' 주변에 ＿＿가 있어서 ＿＿ 뜻이라고 짐작했다.</div>
+            <textarea class="why-input" data-backwhy="1" rows="2" placeholder="예: '3연패를' 주변에 ＿＿가 있어서 ＿＿ 뜻이라고 짐작했다.">${esc(r.why || "")}</textarea>
+` : ""}
+        </section>`;
+    }
+    function toggleBackClue(occId, tokId) { const c = rsub("clues"); const a = c[occId] || []; c[occId] = a.includes(tokId) ? a.filter(x => x !== tokId) : [...a, tokId]; saveState(); keepScrollRender(); }
+    function setBackMean(occId, id) { rsub("mean")[occId] = id; saveState(); keepScrollRender(); }
+
+    function toggleHuman(i) { state.human[i] = !state.human[i]; saveState(); keepScrollRender(); }
+
+    /* ===== 기록 보내기 (구글 Apps Script로 열었을 때) ===== */
+    let saveMsg = "";
+    function buildRecords() {
+      const rows = [], name = (t, id) => { const mi = meaningInfo(t, id); return mi ? `${mi.short} ${mi.name}` : ""; };
+      TARGETS.forEach(t => {
+        const f = state.first[t] || {}, names = state.names[t] || {}, tc = (state.teach[t] || {}).items || {};
+        LEXICON[t].sentences.forEach((s, i) => {
+          const a = f[i]; if (!a || !a.m) return;
+          const toks = tokensOf(s.text), gi = groupOf(t, i);
+          rows.push({ no: state.studentNo, word: t, kind: "제시 문장", sentence: s.text, first: name(t, a.m), clues: (a.clues || []).map(k => toks[k]).join(", "), group: `덩어리 ${GROUP_NAMES[gi]}`, groupName: name(t, names[gi]), keep: "", final: "", why: "" });
+        });
+        const pctText = r => LEXICON[t].meanings.map((m, mi) => `${SHORT[mi]} ${r.pct[m.id]}%`).join(" · ");
+        LEXICON[t].checks.forEach((x, i) => {
+          const it = tc[i]; if (!it || !Array.isArray(it.adds) || !it.adds.length) return;
+          const r0 = teachScores(t, x, []), r1 = teachScores(t, x, it.adds);
+          rows.push({ no: state.studentNo, word: t, kind: `가르치기 ${i + 1} (내가 고른 뜻: ${name(t, it.choice) || "-"} ${it.choice ? (it.choice === x.m ? "⭕" : "❌") : ""})`, sentence: x.text, first: `컴퓨터 처음: ${r0.pick ? name(t, r0.pick) : "헷갈림"} (${pctText(r0)})`,
+            clues: it.adds.map(a => `${a.text} [${name(t, a.m)}]`).join(" / "), group: `컴퓨터 나중: ${r1.pick ? name(t, r1.pick) : "헷갈림"} (${pctText(r1)})`,
+            groupName: `정답 ${name(t, x.m)}`, keep: `넣은 문장 ${it.adds.length}개`, final: r1.pick === x.m ? "가르치기 ⭕" : "가르치기 ❌", why: "" });
+        });
+      });
+      const s = S(), toks = storyTokens();
+      TARGETS.forEach(w => {
+        occsOf(w).forEach((o, i) => {
+          const f0 = (s.first || {})[o.id]; if (!f0 && !(s.same || {})[w]) return;
+          const k = (s.keep || {})[o.id];
+          rows.push({ no: state.studentNo, word: w, kind: `글 읽기 ${i + 1}`, sentence: sentenceOf(o).map(x => x.tok).join(" "), first: name(w, f0), clues: clueWordsOf(o).join(", "), group: (s.same || {})[w] === "same" ? "첫 짐작: 같은 뜻" : (s.same || {})[w] === "diff" ? "첫 짐작: 다른 뜻" : "", groupName: (s.cmp || {})[w] === "similar" ? "주변 단어 비슷" : (s.cmp || {})[w] === "different" ? "주변 단어 다름" : "", keep: k === "keep" ? "유지" : k === "fix" ? "수정" : "", final: name(w, finalOf(o)), why: (s.meanWhy || {})[w] || "" });
+        });
+      });
+      const bk = s.back || {};
+      occsOf(STORY.check.word).forEach((o, i) => {
+        const bm = (bk.mean || {})[o.id]; if (!bm) return;
+        const bt = storyTokens().filter(x => ((bk.clues || {})[o.id] || []).includes(x.id)).map(x => x.tok);
+        rows.push({ no: state.studentNo, word: STORY.check.word, kind: `글로 돌아가기 ${i + 1}`, sentence: sentenceOf(o).map(x => x.tok).join(" "), first: name(STORY.check.word, (s.first || {})[o.id]), clues: bt.join(", "), group: "", groupName: "", keep: (s.first || {})[o.id] ? ((s.first || {})[o.id] === bm ? "유지" : "수정") : "", final: name(STORY.check.word, bm), why: bk.why || "" });
+      });
+      const c = s.chk || {};
+      if (c.m1) rows.push({ no: state.studentNo, word: STORY.check.word, kind: "글 점검 문장", sentence: STORY.check.s1 + " / " + STORY.check.s2, first: name(STORY.check.word, c.m1), clues: c.conf === "sure" ? "확실" : c.conf === "half" ? "반반" : "", group: "", groupName: "", keep: c.keep === "keep" ? "유지" : c.keep === "fix" ? "수정" : "", final: name(STORY.check.word, c.keep === "keep" ? c.m1 : c.m2), why: c.why || "" });
+      const wr = W();
+      if (wr.order.length) rows.push({ no: state.studentNo, word: "", kind: "나의 읽기 순서", sentence: wr.order.map(k => wrapStep(k).name).join(" → "), first: wrapAllRight() ? "⭕" : "❌", clues: "", group: "", groupName: "", keep: "", final: "", why: wr.line || "" });
+      rows.forEach(r => { r.school = state.school; r.frames = [1, 2, 3].map(k => state.frames[k] || "").join(" / "); r.predict = s.predict === "same" ? "같은 것으로 본다" : s.predict === "diff" ? "다른 뜻으로 나눈다" : ""; });
+      return rows;
+    }
+    function sendRecords() {
+      const rows = buildRecords();
+      if (!state.studentNo) { saveMsg = "⚠️ 오른쪽 위 🙋 번호를 눌러 내 번호를 먼저 적어 주세요."; keepScrollRender(); return; }
+      if (!rows.length) { saveMsg = "⚠️ 아직 보낼 생각이 없어요."; keepScrollRender(); return; }
+      if (!HAS_SERVER) { saveMsg = `이 화면에서는 이 기기에만 저장돼요. (기록 ${rows.length}개)`; keepScrollRender(); return; }
+      saveMsg = "보내는 중…"; keepScrollRender();
+      google.script.run.withSuccessHandler(() => { saveMsg = `✅ 선생님께 보냈어요. (기록 ${rows.length}개)`; keepScrollRender(); })
+        .withFailureHandler(() => { saveMsg = "⚠️ 보내지 못했어요. 잠시 뒤 다시 눌러 주세요."; keepScrollRender(); })
+        .saveApp3Records(rows);
+    }
+
+    /* ===== 펜·지우개, 칩 끌기 (앱 2와 같음) ===== */
+    function togglePenMode(mode) { drawTool = drawTool === mode ? 'off' : mode; keepScrollRender(); }
+    function setPenColor(color) { drawColor = color; drawTool = 'pen'; keepScrollRender(); }
+    function setPenSize(size) { drawSize = size; keepScrollRender(); }
+    function clearStage2Canvas() {
+      if (drawingBufferCtx) drawingBufferCtx.clearRect(0, 0, drawingBufferCanvas.width, drawingBufferCanvas.height);
+      if (stage2Ctx && stage2Canvas) stage2Ctx.clearRect(0, 0, stage2Canvas.width, stage2Canvas.height);
+    }
+    function initStage2DrawingCanvas() {
+      const workspace = document.getElementById("chipWorkspace");
+      stage2Canvas = document.getElementById("stage2DrawingCanvas");
+      if (!workspace || !stage2Canvas) return;
+      stage2Ctx = stage2Canvas.getContext("2d");
+      const rect = workspace.getBoundingClientRect(), w = Math.max(rect.width, 300), h = Math.max(rect.height, 580);
+      if (stage2Canvas.width !== w || stage2Canvas.height !== h) { stage2Canvas.width = w; stage2Canvas.height = h; if (drawingBufferCanvas.width === 0) { drawingBufferCanvas.width = w; drawingBufferCanvas.height = h; } }
+      stage2Ctx.drawImage(drawingBufferCanvas, 0, 0);
+      let isDrawing = false, lastX = 0, lastY = 0;
+      const getCoords = e => { const c = stage2Canvas.getBoundingClientRect(); const x = e.touches ? e.touches[0].clientX : e.clientX, y = e.touches ? e.touches[0].clientY : e.clientY; return { x: x - c.left, y: y - c.top }; };
+      const start = e => { if (drawTool === 'off') return; isDrawing = true; const c = getCoords(e); lastX = c.x; lastY = c.y; };
+      const draw = e => {
+        if (!isDrawing || drawTool === 'off') return;
+        e.preventDefault();
+        const c = getCoords(e);
+        const go = ctx => { ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(c.x, c.y);
+          if (drawTool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = drawSize * 5; } else { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = drawColor; ctx.lineWidth = drawSize; }
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); };
+        go(stage2Ctx);
+        if (drawingBufferCanvas.width !== stage2Canvas.width || drawingBufferCanvas.height !== stage2Canvas.height) {
+          const tmp = document.createElement("canvas"); tmp.width = drawingBufferCanvas.width; tmp.height = drawingBufferCanvas.height; tmp.getContext("2d").drawImage(drawingBufferCanvas, 0, 0);
+          drawingBufferCanvas.width = stage2Canvas.width; drawingBufferCanvas.height = stage2Canvas.height; drawingBufferCtx.drawImage(tmp, 0, 0);
+        }
+        go(drawingBufferCtx);
+        lastX = c.x; lastY = c.y;
+      };
+      const stop = () => { isDrawing = false; };
+      stage2Canvas.addEventListener('mousedown', start); stage2Canvas.addEventListener('mousemove', draw); stage2Canvas.addEventListener('mouseup', stop); stage2Canvas.addEventListener('mouseleave', stop);
+      stage2Canvas.addEventListener('touchstart', start, { passive: false }); stage2Canvas.addEventListener('touchmove', draw, { passive: false }); stage2Canvas.addEventListener('touchend', stop);
+    }
+    function bindChipDrag() {
+      const ws = document.getElementById("chipWorkspace");
+      if (!ws) return;
+      let active = null, sx = 0, sy = 0, il = 0, it = 0;
+      ws.querySelectorAll(".word-chip").forEach(chip => {
+        chip.addEventListener("pointerdown", e => { if (chip.classList.contains("hide")) return; active = chip; chip.classList.add("is-dragging"); chip.setPointerCapture(e.pointerId); const r = chip.getBoundingClientRect(), pr = ws.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; il = r.left - pr.left; it = r.top - pr.top; e.preventDefault(); });
+        chip.addEventListener("pointermove", e => {
+          if (active !== chip) return;
+          const pr = ws.getBoundingClientRect(), cr = chip.getBoundingClientRect();
+          const px = Math.max(0, Math.min(pr.width - cr.width, il + e.clientX - sx)) / pr.width * 100;
+          const py = Math.max(0, Math.min(pr.height - cr.height, it + e.clientY - sy)) / pr.height * 100;
+          chip.style.left = px + "%"; chip.style.top = py + "%";
+          const t = state.currentTarget; if (!state.chipPositions[t]) state.chipPositions[t] = {};
+          state.chipPositions[t][chip.dataset.chip] = { x: +px.toFixed(2), y: +py.toFixed(2) };
+        });
+        const rel = e => { if (active !== chip) return; chip.classList.remove("is-dragging"); try { chip.releasePointerCapture(e.pointerId); } catch (er) {} active = null; saveState(); };
+        chip.addEventListener("pointerup", rel); chip.addEventListener("pointercancel", rel);
+      });
+    }
+
+    /* ===== 화면 그리기 ===== */
+    function switchStage(n) { state.currentStage = n; saveState(); render(); window.scrollTo({ top: 0, behavior: "auto" }); }
+    function keepScrollRender() { const y = window.scrollY; render(); window.scrollTo({ top: y }); }
+    function bindTextInputs() {
+      document.querySelectorAll("[data-frame]").forEach(el => el.addEventListener("input", e => { state.frames[e.target.dataset.frame] = e.target.value; saveState(); }));
+      document.querySelectorAll("[data-samewhy]").forEach(el => el.addEventListener("input", e => { storySub("sameWhy")[e.target.dataset.samewhy] = e.target.value; saveState(); }));
+      document.querySelectorAll("[data-meanwhy]").forEach(el => el.addEventListener("input", e => { storySub("meanWhy")[e.target.dataset.meanwhy] = e.target.value; saveState(); }));
+      document.querySelectorAll("[data-backwhy]").forEach(el => el.addEventListener("input", e => { R().why = e.target.value; saveState(); }));
+      document.querySelectorAll("[data-wrapline]").forEach(el => el.addEventListener("input", e => { W().line = e.target.value; saveState(); }));
+      document.querySelectorAll("[data-chkwhy]").forEach(el => el.addEventListener("input", e => { storySub("chk").why = e.target.value; saveState(); }));
+    }
+    function render() {
+      const app = document.getElementById("app");
+      const a = document.activeElement;
+      const keepId = a && a.id && (a.tagName === "TEXTAREA" || a.tagName === "INPUT") ? a.id : null;
+      const s0 = keepId ? a.selectionStart : 0, s1 = keepId ? a.selectionEnd : 0;
+      const s = state.currentStage;
+      if (forceStart || (!state.started && !state.studentNo)) { app.innerHTML = renderStart(); const el = document.getElementById(state.school ? "startNo" : "startSchool"); if (el) el.focus(); return; }
+      app.innerHTML = s === 0 ? renderStory() : s === 1 ? renderStage1() : s === 2 ? renderStage2() : s === 3 ? renderStage3() : s === 4 ? renderStage4() : renderStage5();
+      if (s === 2) { drawS2Table(); bindS2Drag(); }
+      if (s === 3) {
+        const t = state.currentTarget, ws = document.getElementById("chipWorkspace");
+        if (ws) lastMapW = ws.getBoundingClientRect().width || lastMapW;
+        if (ws && !state.chipPositions[t]) { const r = ws.getBoundingClientRect(); state.chipPositions[t] = computeMap(t, r.width, r.height, state.split[t] ? "split" : "one"); saveState(); render(); return; }
+        bindChipDrag(); initStage2DrawingCanvas();
+      }
+      bindTextInputs();
+      if (keepId) { const el = document.getElementById(keepId); if (el) { el.focus(); try { el.setSelectionRange(s0, s1); } catch (e) {} } }
+    }
+    syncLexSig();
+    if (!HAS_SERVER && location.hash === "#start") { forceStart = true; try { history.replaceState(null, "", location.pathname); } catch (e) {} }
+    render();
+    if (HAS_SERVER && google.script.url) google.script.url.getLocation(loc => { if (loc && loc.parameter && loc.parameter.start) { forceStart = true; render(); } });
+    loadLexicon();
+    if (HAS_SERVER) { loadVotes(); setInterval(loadVotes, 15000); }
+  </script>
+</body>
+</html>
