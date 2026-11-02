@@ -9,7 +9,10 @@
  */
 window.APP_CONFIG = {
   API_URL:
-    "https://script.google.com/macros/s/AKfycbzV_uJQOujfRwVNrsLPCd33MIRMSDxUYq1qEDwtvhoqMtBJPjQzGzRSHFOJxvIvbpRu/exec",
+    "https://script.google.com/macros/s/AKfycbySPojMlh4vz-DUFCemO4HaxiFHsPq_rOYNn26nBNXrJmeFIQZPYKEZVQMmBIzAK-wu/exec",
   APP1_URL: "apps/app1.html",
+  APP2_URL: "apps/app2.html",
+  APP3_URL: "apps/app3.html",
+
   PSEUDONYMIZE: true,
 };
