@@ -1143,7 +1143,7 @@
                     (예: "행사=4/0; 없는=0/2" → '행사'를 ① 뜻 문장에서 4번, '없는'을 ② 뜻 문장에서 2번 봄)
                     학생이 넣은 문장은 1번으로 셈. 틀린 뜻 쪽이 2~4 정도 높으면 3번 안에 바꿀 수 있음
        ※ 문장은 띄어쓰기로 나누어 셉니다. 목표 낱말은 조사 없이 따로 쓰고('무료한'은 알아봄),
-         옆 말에도 조사를 붙이지 않습니다. 같은 뜻 문장끼리는 옆 말이 하나 이상 겹치게 만들어 주세요.
+         옆 말에도 조사를 붙이지 않습니다. m 이름표를 기준으로 뜻별 단서 점수를 계산하며, 숫자만 있는 옆 말은 단서에서 제외합니다.
        ===================================================================== */
     const WINDOW = 2;   // 컴퓨터가 양옆으로 보는 칸 수 (고정)
     const LEXICON = {
@@ -1211,7 +1211,7 @@
     const GROUP_NAMES = ["가", "나", "다", "라", "마", "바"];
     const SHORT = ["①", "②", "③"];
     const TARGET_SUFFIX = ["한", "함", "하다", "해", "했다", "하게", "하고", "된", "을", "를", "이", "가", "은", "는", "의", "에", "로", "으로", "도", "만"];
-    const TAB_NAMES = ["📖 글 읽기", "1단계: 문맥 살피기", "2단계: 문맥 단서 세기", "3단계: 뜻 추론하기", "4단계: 추론 점검·수정하기", "🧭 마무리"];
+    const TAB_NAMES = ["📖 글 읽기", "1단계: 문맥 살피기", "2단계: 뜻별 단서 세기", "3단계: 뜻 추론하기", "4단계: 추론 점검·수정하기", "🧭 마무리"];
 
     /* ★ 선생님이 바꾸는 곳: 앱 맨 앞 '글 읽기'
        answers: 글에 나온 순서대로 각 낱말의 뜻 id (위 LEXICON의 meanings 기준) */
@@ -1230,8 +1230,8 @@
 
     const AI_CARDS = {
       1: "안녕하세요! 저는 낱말의 뜻을 몰라요. 대신 <b>옆에 나온 말을 셀 수 있어요.</b><br>'배가 고프다'의 배와 '배를 타다'의 배처럼, 같은 낱말도 뜻이 여러 개일 수 있어요. 여러분이 먼저 읽어 보세요. 문장마다 <b>① 뜻을 알려 준 말(단서)을 눌러 표시</b>하고 <b>② 뜻을 골라요.</b>",
-      2: "이제 제 차례예요. 저는 처음에 이 낱말이 <b>모두 같은 뜻</b>인 줄 알아요. 그런데 문장마다 줄을 펼쳐 보면 옆에 오는 말이 달라요.<br><b>0과 1 모양이 닮은 줄끼리 위아래로 모아 보세요.</b>",
-      3: "제가 <b>0과 1 모양이 닮은 줄끼리</b> 모은 대로 낱말을 나눠 볼게요. <b>[✂️ 옆 말로 나누기]</b>를 눌러 보세요.<br>그런데 나뉜 덩어리가 어떤 뜻인지는 저도 몰라요. <b>여러분이 이름표를 붙여 주세요.</b>",
+      2: "이제 제 차례예요. 이름표가 붙은 어구에서 옆 말이 뜻별로 나온 횟수를 세어 단서 점수표를 만들어요. 숫자만 있는 옆 말은 빼고, 여러 뜻에 나온 말의 표는 비율대로 나눠 더해요.",
+      3: "제가 옆 말들의 표를 더해 가장 높은 뜻 덩어리로 낱말을 나눠 볼게요. <b>[✂️ 옆 말로 나누기]</b>를 눌러 보세요.<br>어떤 옆 말이 표를 보탰는지 살펴보고, 덩어리에 뜻 이름표를 붙여 주세요.",
       4: ""
     };
     const FRAMES = {
@@ -1311,20 +1311,13 @@
     // 1~3단계 수업 어구와 4단계 가르치기 문제는 따로 확인하고 따로 바꾼다
     function okItem(t, s) { const ids = LEXICON[t].meanings.map(m => m.id); return s && typeof s.text === "string" && ids.includes(s.m) && contextOf(s.text, t).tIdx.length > 0; }
     function validLesson(t, d) {
-      if (!d || !Array.isArray(d.sentences) || d.sentences.length < 2 || !d.sentences.every(s => okItem(t, s))) return false;
-      const used = new Set(d.sentences.map(s => s.m));
-      return LEXICON[t].meanings.every(m => used.has(m.id));
+      return !!d && Array.isArray(d.sentences) && d.sentences.length > 0 && d.sentences.every(s => okItem(t, s));
     }
     function applyLexicon(data) {
       TARGETS.forEach(t => {
         const d = data && data[t];
         if (validLesson(t, d)) {
-          const backup = LEXICON[t].sentences;
           LEXICON[t].sentences = d.sentences.map(s => ({ text: s.text, m: s.m }));
-          // 관리자 페이지의 ✅와 같은 조건: 덩어리 수 = 뜻 수, 덩어리마다 한 뜻, 수업 어구 4~12개
-          const groups = computeGroups(t), n = d.sentences.length;
-          const pure = groups.every(g => new Set(g.map(i => LEXICON[t].sentences[i].m)).size === 1);
-          if (groups.length !== LEXICON[t].meanings.length || !pure || n < 4 || n > 12) LEXICON[t].sentences = backup;
         }
         if (d && Array.isArray(d.checks)) {
           const cks = d.checks.filter(s => okItem(t, s)).slice(0, 2);
@@ -1366,26 +1359,57 @@
       return { toks, tIdx, ctxIdx, ctx };
     }
     function sentCtx(t) { return LEXICON[t].sentences.map(s => contextOf(s.text, t).ctx); }
-    function shareWord(a, b) { return a.some(w => b.includes(w)); }
+    const MAX_VISIBLE_SENTENCES_PER_MEANING = 3;
+    function representativeIndices(t, groups = computeGroups(t)) {
+      return groups.flatMap(g => g.slice(0, MAX_VISIBLE_SENTENCES_PER_MEANING));
+    }
+    function isClueWord(w) { return !/^\d+$/u.test(w); }
+    function clueWords(words) { return words.filter(isClueWord); }
+    function shareWord(a, b) { return a.some(w => isClueWord(w) && b.includes(w)); }
 
-    // 컴퓨터가 찾은 덩어리: 옆 말이 하나라도 겹치는 문장끼리 이어 모은다
+    // 뜻별 옆 말 점수를 만들고, 각 문장을 가장 높은 뜻의 덩어리에 넣는다
+    function clueScoreTable(t) {
+      const ids = LEXICON[t].meanings.map(m => m.id), counts = {};
+      LEXICON[t].sentences.forEach(s => {
+        const row = contextOf(s.text, t).ctx;
+        row.filter(isClueWord).forEach(w => {
+          if (!counts[w]) counts[w] = Object.fromEntries(ids.map(id => [id, 0]));
+          if (counts[w][s.m] != null) counts[w][s.m]++;
+        });
+      });
+      const table = {};
+      Object.entries(counts).forEach(([w, byMeaning]) => {
+        const total = ids.reduce((sum, id) => sum + byMeaning[id], 0);
+        if (total) table[w] = Object.fromEntries(ids.map(id => [id, byMeaning[id] / total]));
+      });
+      return table;
+    }
+    function voteScores(t, ctx, table) {
+      return LEXICON[t].meanings.map(m =>
+        ctx.reduce((sum, w) => sum + (table[w] ? table[w][m.id] : 0), 0)
+      );
+    }
     function computeGroups(t) {
-      const C = sentCtx(t), n = C.length, p = C.map((_, i) => i);
-      const f = x => p[x] === x ? x : (p[x] = f(p[x]));
-      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (shareWord(C[i], C[j])) p[f(i)] = f(j);
-      const map = {}, groups = [];
-      for (let i = 0; i < n; i++) { const r = f(i); if (map[r] == null) { map[r] = groups.length; groups.push([]); } groups[map[r]].push(i); }
+      const sentences = LEXICON[t].sentences, table = clueScoreTable(t);
+      const groups = LEXICON[t].meanings.map(() => []);
+      sentences.forEach((s, i) => {
+        const scores = voteScores(t, clueWords(contextOf(s.text, t).ctx), table);
+        const max = Math.max(...scores);
+        const tops = scores.map((score, gi) => score === max ? gi : -1).filter(gi => gi >= 0);
+        const labeled = LEXICON[t].meanings.findIndex(m => m.id === s.m);
+        // 이미 이름표가 있는 학습 어구는 동점일 때 해당 이름표 쪽에 둔다.
+        const winner = tops.includes(labeled) ? labeled : tops[0];
+        if (winner >= 0) groups[winner].push(i);
+      });
       return groups;
     }
     function groupOf(t, i) { return computeGroups(t).findIndex(g => g.includes(i)); }
-    function groupWords(t, gi) { const C = sentCtx(t); const w = {}; computeGroups(t)[gi].forEach(i => C[i].forEach(x => { w[x] = (w[x] || 0) + 1; })); return w; }
 
-    // 새 문장 판단: 옆 말이 겹치는 덩어리를 고른다 (점수는 화면에 보이지 않음)
+    // 새 문장 판단도 학습 어구와 같은 비율표를 사용한다
     function judgeNew(t, text) {
-      const ctx = contextOf(text, t).ctx;
-      const groups = computeGroups(t);
-      const scores = groups.map((g, gi) => { const w = groupWords(t, gi); return ctx.reduce((a, x) => a + (w[x] || 0), 0); });
-      const hits = groups.map((g, gi) => { const w = groupWords(t, gi); return ctx.filter(x => w[x]); });
+      const ctx = clueWords(contextOf(text, t).ctx), table = clueScoreTable(t);
+      const scores = voteScores(t, ctx, table);
+      const hits = LEXICON[t].meanings.map(m => ctx.filter(w => table[w] && table[w][m.id] > 0));
       const max = Math.max(...scores);
       const tops = scores.map((s, i) => s === max ? i : -1).filter(i => i >= 0);
       if (max === 0) return { kind: "unknown", ctx, scores, hits };
@@ -1744,7 +1768,7 @@
                 : `<button type="button" onclick="toggleShowWin()">${state.showWin ? "윈도우 숨기기" : "👀 윈도우 보기"}</button>`}
             </div>`}
         ${frameHTML(1, "1단계 정리: 사람과 AI 견주기")}
-        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(2)">다음 단계 (문맥 단서 세기) →</button></div>`;
+        <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(2)">다음 단계 (뜻별 단서 세기) →</button></div>`;
     }
     function toggleClue(i, k) { const f = sub("first", state.currentTarget); const c = f[i] || (f[i] = { m: null, clues: [] }); c.clues = c.clues.includes(k) ? c.clues.filter(x => x !== k) : [...c.clues, k].sort((a, b) => a - b); saveState(); keepScrollRender(); }
     function setFirst(i, id) { const f = sub("first", state.currentTarget); const c = f[i] || (f[i] = { m: null, clues: [] }); c.m = c.m === id ? null : id; saveState(); keepScrollRender(); }
@@ -1758,7 +1782,7 @@
     function answerWin() { state.winAsk = true; saveState(); keepScrollRender(); }
     function toggleShowWin() { state.showWin = !state.showWin; saveState(); keepScrollRender(); }
 
-    /* ===== 2단계: 문맥 단서 세기 ===== */
+    /* ===== 2단계: 뜻별 단서 세기 ===== */
     function orderOf(t) {
       const n = LEXICON[t].sentences.length;
       const o = state.order[t];
@@ -1778,9 +1802,9 @@
           <div class="s2-wrap" id="s2wrap"><table class="s2" id="s2table"></table></div>
           ${sc === 1 ? `<div class="btn-group" style="margin:12px 0 0">
               <button type="button" class="action-btn ${(state.showChain || {})[t] ? "" : "primary"}" onclick="toggleChain()">${(state.showChain || {})[t] ? "📄 문장 숨기기" : "📄 문장 보기"}</button></div>
-            ${(state.showChain || {})[t] ? `<div class="chain-title">🔗는 위 줄과 1이 겹친 옆 말이에요.</div>
+            ${(state.showChain || {})[t] ? `<div class="chain-title">🔗는 이어진 두 문장에 함께 나온 옆 말이에요.</div>
               <div class="s2-wrap"><table class="s2" id="s2chain"></table></div>` : ""}` : ""}
-          <p class="rule-note">숫자는 낱말 양옆 ${WINDOW}칸 안에 그 말이 <b>함께 나온 횟수</b>예요. ★는 내가 1단계에서 고른 단서예요.${sc === 0 ? " ▲▼를 누르거나 ⋮⋮를 끌어 줄을 옮겨요." : ""}</p>
+          <p class="rule-note">전체 어구를 계산하고, 표에는 뜻마다 대표 어구를 최대 3개 보여 줘요. 표는 이름표가 붙은 어구에서 옆 말이 뜻별로 나온 횟수예요. 숫자만 있는 말은 빼고, 여러 뜻에 나온 말은 비율대로 표를 나눠 더해요. ★는 내가 1단계에서 고른 단서예요.${sc === 0 ? " ▲▼를 누르거나 ⋮⋮를 끌어 줄을 옮겨요." : ""}</p>
         </section>
         ${frameHTML(2, "2단계 정리: 사람과 AI 견주기")}
         <div class="bottom-area"><button type="button" class="next-btn" onclick="switchStage(3)">다음 단계 (뜻 추론하기) →</button></div>`;
@@ -1791,12 +1815,16 @@
       const tbl = document.getElementById("s2table"), msg = document.getElementById("s2msg");
       if (!tbl) return;
       const clues = myClueWords(t), groups = computeGroups(t);
+      const shown = new Set(representativeIndices(t, groups));
       let rows = [];
-      if (sc === 0) rows = orderOf(t).map(i => ({ idx: i, label: `<span class="row-sen">${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span>`, words: C[i], cls: "one" }));
-      if (sc === 1) rows = groups.map((g, gi) => ({ label: `<span class="group-tag" style="background:${GROUP_COLORS[gi]}">${esc(t)} · ${esc(groupLabel(t, gi))}</span> <span class="row-sen">(문장 ${g.map(i => i + 1).join(", ")})</span>`, words: g.flatMap(i => C[i]), cls: "one", color: GROUP_COLORS[gi] }));
+      if (sc === 0) rows = orderOf(t).filter(i => shown.has(i)).map(i => ({ idx: i, label: `<span class="row-sen">${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span>`, words: clueWords(C[i]), cls: "one" }));
+      if (sc === 1) rows = groups.map((g, gi) => {
+        const examples = g.filter(i => shown.has(i));
+        return { label: `<span class="group-tag" style="background:${GROUP_COLORS[gi]}">${esc(t)} · ${esc(groupLabel(t, gi))}</span> <span class="row-sen">(대표 문장 ${examples.map(i => i + 1).join(", ") || "없음"} · 전체 ${g.length}개)</span>`, words: g.flatMap(i => clueWords(C[i])), cls: "one", color: GROUP_COLORS[gi] };
+      });
       // 칸 순서: 지금 줄 순서에서 처음 나오는 차례 → 모이면 덩어리 모양이 보인다
       const cols = []; rows.forEach(r => r.words.forEach(w => { if (!cols.includes(w)) cols.push(w); }));
-      const count = {}; C.forEach(ws => [...new Set(ws)].forEach(w => { count[w] = (count[w] || 0) + 1; }));
+      const count = {}; C.forEach(ws => [...new Set(clueWords(ws))].forEach(w => { count[w] = (count[w] || 0) + 1; }));
       let html = `<thead><tr><th>${sc === 0 ? "문장 (줄 옮기기)" : "목표 낱말"}</th>${cols.map(c => `<th class="${clues.includes(c) ? "clue-col" : count[c] > 1 ? "shared" : ""}">${clues.includes(c) ? "★" : ""}${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
       rows.forEach((r, k) => {
         const v = {}; r.words.forEach(w => { v[w] = (v[w] || 0) + 1; });
@@ -1808,25 +1836,25 @@
       if (msg) {
         msg.className = "s2-msg";
         msg.style.display = sc === 0 ? "none" : "";
-        const nWord = ["한", "두", "세", "네", "다섯", "여섯"][groups.length - 1] || groups.length;
         if (sc === 1) msg.innerHTML = (state.showChain || {})[t]
-          ? `🤖 저는 <b>0과 1 모양이 닮은 줄끼리</b> 모았어요. 뜻이 다른 문장끼리 잘 나뉘었나요?`
-          : `🤖 컴퓨터는 왜 '${esc(t)}'를 <b>${nWord} 덩어리</b>로 나눴을까요? <b>[문장 보기]</b>를 눌러 0과 1 모양을 살펴보세요.`;
+          ? `🤖 저는 뜻별 단서 점수를 더해 어구를 나눴어요. 대표 문장과 전체 횟수를 함께 살펴보세요.`
+          : `🤖 옆 말의 표를 더해 가장 높은 뜻 덩어리로 나눴어요. <b>[문장 보기]</b>에서 대표 문장의 단서를 살펴보세요.`;
       }
       drawChainTable();
     }
 
-    // ② [문장 보기]: 컴퓨터가 모은 순서로 줄을 놓고, 위 줄과 1이 겹친 옆 말이 있으면 🔗 표시
+    // ② [문장 보기]: 덩어리별 대표 문장을 놓고, 이어진 줄의 공통 단서를 표시한다
     function drawChainTable() {
       const t = state.currentTarget, tbl = document.getElementById("s2chain");
       if (!tbl) return;
-      const L = LEXICON[t], C = sentCtx(t), order = computeGroups(t).flatMap(g => bestChain(t, g));
-      const cols = []; order.forEach(i => C[i].forEach(w => { if (!cols.includes(w)) cols.push(w); }));
+      const L = LEXICON[t], C = sentCtx(t), groups = computeGroups(t), shown = new Set(representativeIndices(t, groups));
+      const order = groups.flatMap(g => bestChain(t, g)).filter(i => shown.has(i));
+      const cols = []; order.forEach(i => clueWords(C[i]).forEach(w => { if (!cols.includes(w)) cols.push(w); }));
       let html = `<thead><tr><th>문장</th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
       order.forEach((i, k) => {
         const prev = k > 0 ? order[k - 1] : null, link = prev !== null && shareWord(C[prev], C[i]);
-        const sharedW = link ? [...new Set(C[i].filter(w => C[prev].includes(w)))] : [];
-        const v = {}; C[i].forEach(w => { v[w] = (v[w] || 0) + 1; });
+        const sharedW = link ? [...new Set(clueWords(C[i].filter(w => C[prev].includes(w))))] : [];
+        const v = {}; clueWords(C[i]).forEach(w => { v[w] = (v[w] || 0) + 1; });
         html += `<tr class="${link ? "link" : k > 0 ? "gap" : ""}"><td>${link ? `<div class="link-tag">🔗 ${sharedW.map(esc).join(", ")}</div>` : ""}<div class="row-label"><span class="row-sen">${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span></div></td>
           ${cols.map(c => `<td class="${v[c] ? "one" : ""}">${v[c] || 0}</td>`).join("")}</tr>`;
       });
@@ -1868,13 +1896,22 @@
         const tr = el && el.closest("tr[data-k]");
         if (!tr) return;
         const k = Number(tr.dataset.k);
-        if (k !== dragK) { const o = orderOf(state.currentTarget); const [x] = o.splice(dragK, 1); o.splice(k, 0, x); dragK = k; drawS2Table(); }
+        if (k !== dragK) { moveVisibleRow(dragK, k); dragK = k; }
       });
       const end = e => { if (dragK === null) return; dragK = null; try { wrap.releasePointerCapture(e.pointerId); } catch (er) {} saveState(); drawS2Table(); };
       wrap.addEventListener("pointerup", end);
       wrap.addEventListener("pointercancel", end);
     }
-    function moveRow(k, d) { const o = orderOf(state.currentTarget), j = k + d; if (j < 0 || j >= o.length) return; [o[k], o[j]] = [o[j], o[k]]; saveState(); drawS2Table(); }
+    function moveRow(k, d) { moveVisibleRow(k, k + d); }
+    function moveVisibleRow(from, to) {
+      const t = state.currentTarget, o = orderOf(t), shown = new Set(representativeIndices(t));
+      const visible = o.filter(i => shown.has(i));
+      if (from < 0 || to < 0 || from >= visible.length || to >= visible.length) return;
+      const a = o.indexOf(visible[from]), b = o.indexOf(visible[to]);
+      [o[a], o[b]] = [o[b], o[a]];
+      saveState();
+      drawS2Table();
+    }
     // 처음으로: 문장을 처음 순서(1, 2, 3 …)로 되돌린다
     function resetRows() { state.order[state.currentTarget] = [...Array(LEXICON[state.currentTarget].sentences.length).keys()]; saveState(); drawS2Table(); }
     function setScene(i) { state.scene[state.currentTarget] = i; saveState(); keepScrollRender(); }
@@ -1883,7 +1920,11 @@
 
     /* ===== 3·4단계: 단어 지도, 이름표, 점검 ===== */
     function chipW(text, px) { return text.length * px + 40; }
-    function allContextWords(t) { const ws = []; sentCtx(t).forEach(c => c.forEach(w => { if (!ws.includes(w)) ws.push(w); })); return ws; }
+    function allContextWords(t) {
+      const ws = [], C = sentCtx(t);
+      representativeIndices(t).forEach(i => clueWords(C[i]).forEach(w => { if (!ws.includes(w)) ws.push(w); }));
+      return ws;
+    }
 
     let lastMapW = 900;
     function isNarrow(W) { return W < 640; }
@@ -1895,6 +1936,7 @@
     }
     function computeMap(t, W, H, mode) {
       const L = LEXICON[t], C = sentCtx(t), groups = computeGroups(t), words = allContextWords(t), narrow = isNarrow(W);
+      const shown = new Set(representativeIndices(t, groups));
       const out = {}, items = [];
       const add = (key, x, y, w, pinned, hide) => { out[key] = { x: x - (w / W * 100) / 2, y, hide: !!hide }; if (!hide) items.push({ key, w: w / W * 100, pinned }); };
       const gc = groupCenters(t, W);
@@ -1902,15 +1944,16 @@
       if (mode === "one") {
         add("big", 50, narrow ? 37 : 34, chipW(t, fs.big), true);
         words.forEach((w, i) => { const a = (i / words.length) * Math.PI * 2; add("c:" + w, 50 + Math.cos(a) * (narrow ? 36 : 38), (narrow ? 37 : 34) + Math.sin(a) * (narrow ? 33 : 28), chipW(w, fs.ctx), false); });
-        L.sentences.forEach((s, i) => add("o:" + i, 50, 34, chipW(t + "·9", fs.occ), false, true));
+        shown.forEach(i => add("o:" + i, 50, 34, chipW(t + "·9", fs.occ), false, true));
         groups.forEach((g, gi) => add("g:" + gi, gc[gi].cx, gc[gi].tagY, chipW(groupLabel(t, gi), fs.tag), false, true));
       } else {
         add("big", 50, 34, chipW(t, fs.big), false, true);
         groups.forEach((g, gi) => {
           const { cx, cy, tagY, rx, ry } = gc[gi];
           add("g:" + gi, cx, tagY, chipW(groupLabel(t, gi), fs.tag), true);
-          g.forEach((i, j) => { const a = (j / g.length) * Math.PI * 2 - Math.PI / 2; add("o:" + i, cx + Math.cos(a) * rx[0], cy + Math.sin(a) * ry[0], chipW(t + "·9", fs.occ), false); });
-          const gw = []; g.forEach(i => C[i].forEach(w => { if (!gw.includes(w)) gw.push(w); }));
+          const visible = g.filter(i => shown.has(i));
+          visible.forEach((i, j) => { const a = (j / visible.length) * Math.PI * 2 - Math.PI / 2; add("o:" + i, cx + Math.cos(a) * rx[0], cy + Math.sin(a) * ry[0], chipW(t + "·9", fs.occ), false); });
+          const gw = []; visible.forEach(i => clueWords(C[i]).forEach(w => { if (!gw.includes(w)) gw.push(w); }));
           gw.forEach((w, j) => { if (out["c:" + w]) return; const a = (j / gw.length) * Math.PI * 2; add("c:" + w, cx + Math.cos(a) * rx[1], cy + Math.sin(a) * ry[1], chipW(w, fs.ctx), false); });
         });
       }
@@ -1938,6 +1981,7 @@
 
     function renderStage3() {
       const t = state.currentTarget, L = LEXICON[t], groups = computeGroups(t), split = !!state.split[t];
+      const shown = new Set(representativeIndices(t, groups));
       const names = sub("names", t), allNamed = groups.every((g, gi) => names[gi]);
       const colors = ['#ef4444', '#2563eb', '#16a34a', '#000000', '#eab308', '#8b5cf6'];
       const pos = state.chipPositions[t] || computeMap(t, lastMapW, 580, split ? "split" : "one");
@@ -1970,7 +2014,7 @@
               <canvas id="stage2DrawingCanvas" class="drawing-canvas ${drawTool !== 'off' ? 'canvas-active' : ''}"></canvas>
               ${chipHTML("big", `${esc(t)}`, "big", pos)}
               ${groups.map((g, gi) => chipHTML("g:" + gi, esc(groupLabel(t, gi)), "tag", pos, `background:${GROUP_COLORS[gi]}`)).join("")}
-              ${L.sentences.map((s, i) => chipHTML("o:" + i, `${esc(t)}<small style="opacity:.7">·${i + 1}</small>`, "occ", pos, `border-color:${GROUP_COLORS[groupOf(t, i)]}`, s.text)).join("")}
+              ${L.sentences.map((s, i) => shown.has(i) ? chipHTML("o:" + i, `${esc(t)}<small style="opacity:.7">·${i + 1}</small>`, "occ", pos, `border-color:${GROUP_COLORS[groupOf(t, i)]}`, s.text) : "").join("")}
               ${allContextWords(t).map(w => chipHTML("c:" + w, esc(w), "ctx", pos)).join("")}
             </div>
           </div>
@@ -1984,8 +2028,8 @@
           <div class="group-grid">
             ${groups.map((g, gi) => `
               <div class="group-card" style="border-color:${GROUP_COLORS[gi]}">
-                <h4><span class="group-tag" style="background:${GROUP_COLORS[gi]}">덩어리 ${GROUP_NAMES[gi]}</span> 문장 ${g.length}개</h4>
-                <ul>${g.map(i => `<li><span>${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span>${(f[i] && f[i].m) ? pill(t, f[i].m) : `<span class="mini-pill none">내 뜻 없음</span>`}</li>`).join("")}</ul>
+                <h4><span class="group-tag" style="background:${GROUP_COLORS[gi]}">덩어리 ${GROUP_NAMES[gi]}</span> 전체 ${g.length}개 · 대표 ${g.filter(i => shown.has(i)).length}개</h4>
+                <ul>${g.filter(i => shown.has(i)).map(i => `<li><span>${i + 1}. ${sentHTML(t, L.sentences[i].text)}</span>${(f[i] && f[i].m) ? pill(t, f[i].m) : `<span class="mini-pill none">내 뜻 없음</span>`}</li>`).join("")}</ul>
                 <div class="m-pick">${L.meanings.map((m, mi) => `<button type="button" class="m-btn ${names[gi] === m.id ? "on" : ""}" style="${names[gi] === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="setName(${gi}, '${m.id}')">${SHORT[mi]} ${esc(m.name)}</button>`).join("")}</div>
               </div>`).join("")}
           </div>
@@ -2004,7 +2048,7 @@
       const groups = computeGroups(t);
       const pred = state.story.predict && t === STORY.check.word ? `📖 글 읽기에서 나는 컴퓨터가 '연패' 두 개를 <b>${state.story.predict === "same" ? "같은 것으로 본다" : "다른 뜻으로 나눈다"}</b>고 예측했어요.<br>` : "";
       if (!state.split[t]) return pred + `🤖 저는 처음에 '${esc(t)}'이(가) 모두 <b>같은 뜻</b>인 줄 알았어요. 그래서 옆에 나온 말들이 '${esc(t)}' 하나에 모두 붙어 있어요. 이 말들이 정말 한 가지 뜻의 단서일까요?`;
-      return `🤖 옆에 같은 말이 나온 문장끼리 모았더니 '${esc(t)}'이(가) <b>덩어리 ${groups.length}개</b>로 나뉘었어요. 각 덩어리 옆에는 서로 다른 말들이 모여 있어요.`;
+      return `🤖 옆 말의 표를 더해 '${esc(t)}'을(를) <b>뜻별 덩어리 ${groups.length}개</b>로 나눴어요. 뜻마다 대표 어구를 보여 주고 있어요.`;
     }
 
     function setSplit(v) {
@@ -2164,7 +2208,7 @@
             <h2>👥 컴퓨터가 뜻을 나누기까지, 사람이 정한 것은?</h2>
             <p>사람이 정한 것이라고 생각하면 눌러 표시해요.</p></div></div>
           <div class="human-list">${HUMAN_DECISIONS.map((h, i) => `<span class="human-item ${state.human[i] ? "on" : ""}" onclick="toggleHuman(${i})">${state.human[i] ? "✅" : "⬜"} ${h}</span>`).join("")}</div>
-          <div class="class-summary">컴퓨터는 처음에 같은 낱말을 한 뜻으로 보았다가, 0과 1 모양이 닮은 줄끼리 모아 뜻을 나누었어요.<br>
+          <div class="class-summary">컴퓨터는 이름표가 붙은 어구에서 옆 말의 단서를 뜻별로 세고, 표를 나눠 더해 가장 높은 뜻으로 낱말을 나누었어요.<br>
             사람은 옆 말과 낱말의 뜻, 내 경험을 함께 생각해서 뜻을 가려내요. 나는 낱말의 뜻과 경험까지 함께 읽어요. 이것이 <b>문맥 추론</b>이에요.<br>
             컴퓨터는 같은 말을 찾아 셀 뿐, 뜻을 알지는 못해요. 그리고 뜻 이름표를 붙인 것은 <b>사람</b>이에요.</div>
         </section>
@@ -2179,7 +2223,7 @@
     }
 
     /* ===== 마무리: 나의 읽기 순서 ===== */
-    // 사람의 읽기 순서 (모형 2단계 '문맥 단서 세기'는 컴퓨터의 방법이라 넣지 않음)
+    // 사람의 읽기 순서 (모형 2단계 '뜻별 단서 세기'는 컴퓨터의 방법이라 넣지 않음)
     const WRAP_STEPS = [
       { k: 1, name: "문맥 살피기", say: "낱말 앞뒤를 살펴 읽어요" },
       { k: 2, name: "뜻 추론하기", say: "단서로 뜻을 짐작해요" },

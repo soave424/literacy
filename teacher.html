@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>교사용 · 문맥 추론 점검 모형</title>
+<script src="config.js"></script>
+<script src="gas-bridge.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --navy: #24357a; --navy-2: #1b2860; --ink: #1f2937; --muted: #64748b; --line: #dfe4ee; --bg: #f5f7fb; --card: #fff;
+    --s1: #3b6fd8; --s1-bg: #eaf1ff; --s2: #1f9d6b; --s2-bg: #e7f7ef; --s3: #7c5cdb; --s3-bg: #f1ecff; --s4: #e07b2f; --s4-bg: #fff2e6;
+    --lit: #2f6b52; --nlp: #5145cd;
+  }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; color: var(--ink); background: var(--bg); line-height: 1.55; }
+  button { font: inherit; cursor: pointer; }
+  a { color: inherit; }
+
+  /* ----- 상단 ----- */
+  .top { position: sticky; top: 0; z-index: 20; background: var(--navy); color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 16px; height: 58px; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  .brand { display: flex; flex-direction: column; line-height: 1.2; white-space: nowrap; cursor: pointer; }
+  .brand b { font-size: 17px; letter-spacing: -.2px; }
+  .brand small { font-size: 12px; opacity: .75; }
+  .nav { display: flex; gap: 4px; overflow-x: auto; flex: 1; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button { background: transparent; border: 0; color: #dbe3ff; padding: 8px 13px; border-radius: 10px; font-weight: 700; font-size: 14.5px; white-space: nowrap; }
+  .nav button:hover { background: rgba(255,255,255,.1); color: #fff; }
+  .nav button.on { background: #fff; color: var(--navy); }
+  .nav .sep { width: 1px; background: rgba(255,255,255,.2); margin: 10px 4px; flex: none; }
+  .conn { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; background: rgba(255,255,255,.12); }
+  .conn.ok { background: #1f9d6b; } .conn.warn { background: #b45309; }
+
+  main { min-height: calc(100vh - 58px); }
+  .wrap { width: min(1180px, 100%); margin: 0 auto; padding: 22px 18px 40px; }
+
+  /* ----- 모형 ----- */
+  .title-pill { display: block; width: fit-content; margin: 6px auto 16px; background: var(--navy); color: #fff; padding: 12px 46px; border-radius: 999px; font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+  .eq { border: 2px solid #8b94b8; background: #fff; border-radius: 14px; padding: 12px 16px; text-align: center; font-weight: 800; font-size: 18px; color: var(--navy-2); margin-bottom: 14px; }
+  .eq small { font-weight: 600; color: var(--muted); font-size: 13px; }
+  .stages { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 26px; position: relative; }
+  .stage { background: #fff; border: 2px solid var(--c); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .stage:not(:last-child)::after { content: "➜"; position: absolute; right: -22px; top: 46%; color: var(--navy); font-size: 18px; }
+  .stage .head { background: var(--cb); text-align: center; padding: 12px 8px 10px; }
+  .stage .head small { display: block; color: var(--muted); font-size: 13px; }
+  .stage .head b { font-size: 19px; color: #111827; }
+  .stage .body { padding: 12px; text-align: center; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .tag { display: inline-block; padding: 2px 12px; border-radius: 999px; color: #fff; font-size: 12.5px; font-weight: 800; }
+  .tag.lit { background: var(--lit); } .tag.nlp { background: var(--nlp); }
+  .lit-box p, .nlp-box p { margin: 6px 0 0; font-size: 14.5px; }
+  .nlp-box { background: #f3f2fb; border-radius: 10px; padding: 10px 8px; }
+  .basis { font-size: 12.5px; font-weight: 800; color: var(--c); margin-top: auto; }
+  .band { border-radius: 12px; padding: 11px 14px; text-align: center; font-weight: 700; margin-top: 12px; }
+  .band small { color: var(--muted); font-weight: 600; }
+  .band.cmp { background: #eefafb; border: 1.5px solid #8fd3d8; }
+  .band.move { background: #fff; border: 1.5px solid #9aa3bf; }
+  .band.cycle { font-weight: 800; color: var(--navy-2); }
+  .band.media { border: 1.5px dashed #b8bfd3; color: var(--muted); font-weight: 600; font-size: 14px; }
+  .sec-title { font-size: 19px; font-weight: 800; margin: 30px 0 10px; color: var(--navy-2); }
+  .lesson-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .lcard { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px; text-align: left; display: flex; flex-direction: column; gap: 6px; transition: .15s; }
+  .lcard:hover { border-color: var(--navy); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(36,53,122,.1); }
+  .lcard .no { font-size: 13px; font-weight: 800; color: var(--navy); }
+  .lcard b { font-size: 16px; line-height: 1.35; }
+  .lcard .app { font-size: 13px; color: var(--muted); }
+  .lcard .who { font-size: 12.5px; font-weight: 700; background: var(--bg); border-radius: 8px; padding: 4px 8px; margin-top: auto; }
+  .flow { display: grid; grid-template-columns: 110px repeat(3, minmax(0,1fr)); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; font-size: 14px; }
+  .flow > div { padding: 9px 11px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .flow .h { background: #f1f4fa; font-weight: 800; }
+  .flow .rowh { font-weight: 800; }
+
+  /* ----- 차시 화면 ----- */
+  .lesson { display: grid; grid-template-columns: 380px minmax(0,1fr); height: calc(100vh - 58px); }
+  .lesson.hide-panel { grid-template-columns: 0 minmax(0,1fr); }
+  .lesson.hide-panel .panel { display: none; }
+  .panel { background: #fff; border-right: 1px solid var(--line); overflow-y: auto; padding: 16px 16px 30px; }
+  .panel .no { font-size: 13px; font-weight: 800; color: var(--navy); }
+  .panel h2 { margin: 2px 0 6px; font-size: 20px; line-height: 1.35; }
+  .panel .meta { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .goals { background: var(--bg); border-radius: 12px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .goals b { display: block; font-size: 13px; color: var(--navy); margin-bottom: 2px; }
+  .goals ul { margin: 0; padding-left: 18px; }
+  .stepper { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin-bottom: 10px; position: sticky; top: -16px; background: #fff; padding: 6px 0; z-index: 2; }
+  .stepper button { border: 2px solid var(--c); background: #fff; color: var(--c); border-radius: 10px; padding: 6px 2px; font-size: 12.5px; font-weight: 800; line-height: 1.25; }
+  .stepper button.on { background: var(--c); color: #fff; }
+  .step { border: 1.5px solid var(--line); border-left: 6px solid var(--c); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 14.2px; }
+  .step.on { border-color: var(--c); background: var(--cb); }
+  .step h3 { margin: 0 0 6px; font-size: 15.5px; color: var(--c); display: flex; justify-content: space-between; gap: 6px; }
+  .step h3 small { color: var(--muted); font-weight: 700; font-size: 12px; }
+  .step ol, .step ul { margin: 0; padding-left: 18px; }
+  .step li { margin: 3px 0; }
+  .step .tip { margin-top: 6px; font-size: 13px; color: #6b4f00; background: #fff8db; border-radius: 8px; padding: 6px 8px; }
+  .step .pair { margin-top: 6px; display: grid; gap: 4px; font-size: 13px; }
+  .step .pair span { border-radius: 8px; padding: 4px 8px; }
+  .step .pair .l { background: #e8f4ee; color: var(--lit); } .step .pair .n { background: #eeecfb; color: var(--nlp); }
+  .wrapup { background: #102a5c; color: #fff; border-radius: 12px; padding: 12px; font-size: 14px; margin-top: 4px; }
+  .wrapup b { display: block; font-size: 13px; opacity: .8; margin-bottom: 4px; }
+  .stage-frame { display: flex; flex-direction: column; min-width: 0; background: #e9edf5; }
+  .frame-bar { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .frame-bar .t { font-weight: 800; font-size: 14.5px; margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .btn { border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 6px 11px; font-weight: 700; font-size: 13.5px; color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .btn:hover { background: #f1f5f9; }
+  .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  iframe.app { flex: 1; width: 100%; border: 0; background: #fff; }
+  .empty { flex: 1; display: grid; place-items: center; text-align: center; padding: 30px; color: var(--muted); }
+  .empty .box { background: #fff; border: 2px dashed var(--line); border-radius: 16px; padding: 28px; max-width: 520px; }
+
+  /* ----- 교사 ----- */
+  .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card h3 { margin: 0 0 8px; font-size: 16.5px; }
+  .card p, .card li { font-size: 14.5px; }
+  code { background: #f1f4fa; padding: 1px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 14px; }
+  .ok-t { color: #15803d; font-weight: 800; } .warn-t { color: #b45309; font-weight: 800; }
+  .teacher-login { width: min(440px, calc(100% - 32px)); margin: 12vh auto; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 26px; box-shadow: 0 8px 30px #24357a12; }
+  .teacher-login input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; font: inherit; margin: 8px 0; }
+  .teacher-login button, .result-btn { border: 0; border-radius: 9px; padding: 9px 14px; color: #fff; background: var(--navy); font-weight: 800; }
+  .teacher-login .error { min-height: 22px; color: #b91c1c; font-weight: 700; }
+  .result-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .result-tabs button { border: 1px solid var(--line); background: white; border-radius: 9px; padding: 8px 12px; font-weight: 800; }
+  .result-tabs button.on { background: var(--navy); color: white; }
+  .result-table { overflow: auto; max-height: 58vh; border: 1px solid var(--line); border-radius: 9px; }
+  .result-table table { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; }
+  .result-table th, .result-table td { border-bottom: 1px solid var(--line); padding: 7px; text-align: left; vertical-align: top; min-width: 90px; max-width: 320px; overflow-wrap: anywhere; }
+  .result-table th { position: sticky; top: 0; background: #f1f4fa; z-index: 1; }
+
+  @media (max-width: 980px) {
+    .stages, .lesson-grid { grid-template-columns: 1fr 1fr; }
+    .stage::after { display: none; }
+    .lesson { grid-template-columns: 1fr; height: auto; }
+    .panel { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }
+    iframe.app { min-height: 80vh; }
+    .tgrid { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 90px repeat(3, minmax(0,1fr)); font-size: 13px; }
+  }
+  @media (max-width: 600px) { .stages, .lesson-grid { grid-template-columns: 1fr; } .brand small { display: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand" onclick="go('model')"><b>문맥 추론 점검 모형</b><small>말의 뜻은 어떻게 이해되는가?</small></div>
+  <nav class="nav" id="nav"></nav>
+  <span class="conn" id="conn">…</span>
+</header>
+<main id="main"></main>
+
+<script>
+/* =====================================================================
+   수업 자료 (차시별 수업 흐름)
+   - 앱 주소는 config.js, 차시 내용은 아래 LESSONS 를 고치면 됩니다.
+   ===================================================================== */
+const CFG = window.APP_CONFIG || {};
+const STAGES = [
+  { key: 1, name: "문맥 살피기", short: "문맥\n살피기", c: "var(--s1)", cb: "var(--s1-bg)",
+    lit: "낯선 낱말 앞뒤를 어디까지 읽을지 정하고 단서를 살핀다", nlp: "문장을 낱말로 나누고 살필 범위(윈도우)를 정한다", basis: "문맥 범위 조절 원리(4)" },
+  { key: 2, name: "문맥 단서 세기", short: "단서\n세기", c: "var(--s2)", cb: "var(--s2-bg)",
+    lit: "뜻을 알려 주는 단서 말을 찾아 표시한다", nlp: "함께 나온 말의 횟수를 세어 수(표)로 나타낸다", basis: "직접 세기 원리(3)" },
+  { key: 3, name: "뜻 추론하기", short: "뜻\n추론하기", c: "var(--s3)", cb: "var(--s3-bg)",
+    lit: "단서를 근거로 뜻을 짐작하고 근거를 말한다", nlp: "수가 비슷한 낱말·문장끼리 묶어 판단한다", basis: "숫자 근거 추론 원리(5)" },
+  { key: 4, name: "추론 점검·수정하기", short: "점검·\n수정하기", c: "var(--s4)", cb: "var(--s4-bg)",
+    lit: "새 문맥을 읽고 처음 해석을 유지하거나 고친다", nlp: "새 자료로 다시 세면 판단이 바뀐다 (사람이 정한 자료·설정)", basis: "점검 주체 이양 원리(2)" }
+];
+
+const APPS = {
+  app1: { name: "앱 1 · BoW", title: "단어만 같으면 뜻도 같을까?", src: () => CFG.APP1_URL || "" },
+  app2: { name: "앱 2 · Word2Vec", title: "주변 단어는 어떤 단서가 될까?", src: () => "apps/app2.html" },
+  app3: { name: "앱 3 · 다의어", title: "같은 낱말, 옆 말로 뜻을 나눌 수 있을까?", src: () => "apps/app3.html" },
+  admin: { name: "앱 3 관리자", title: "어구 관리", src: () => "apps/admin.html" }
+};
+
+const LESSONS = [
+  { id: "l1", no: "1~2차시", app: "app1", title: "낱말이 있는지만 세면 뜻을 알 수 있을까?",
+    subj: "국어 · 수학 · 실과/정보", who: "점검: 학생이 컴퓨터의 추론을 점검",
+    goals: ["낱말이 같아도 순서와 문맥에 따라 뜻이 달라짐을 문장 비교로 설명한다", "BoW 표가 놓치는 것을 찾고, 사람이 뜻을 이해할 때 무엇을 더 읽는지 말한다"],
+    steps: [
+      { items: ["본질적 질문 ‘말의 뜻은 어떻게 이해되는가?’를 연다", "모르는 낱말을 문맥으로 짐작했던 경험을 <b>한 문장</b>으로 적는다", "사람은 맥락과 의미로, 컴퓨터는 문자를 수(0과 1)로 바꿔야 함을 확인한다"],
+        tip: "적은 문장은 6차시 정리에서 다시 꺼내 비교해요." },
+      { items: ["문장 2~3개를 넣고 낱말로 나눠 중복 없는 <b>단어 가방</b>을 만든다", "문장마다 낱말이 <b>있으면 1, 없으면 0</b>으로 표를 만든다"],
+        tip: "불용어 처리는 앱이 화면 뒤에서 해요." },
+      { items: ["“사자가 호랑이를 공격했다” vs “호랑이가 사자를 공격했다”의 0/1 표를 비교한다", "표가 같아 컴퓨터는 같은 뜻으로 본다 → ‘표가 같은데 왜 나는 뜻이 다르다고 느낄까?’에 근거를 들어 답한다"],
+        tip: "‘누가 누구를’처럼 순서가 뜻을 바꾸는 점에 주목해요." },
+      { items: ["낱말만 세면 문맥을 놓친다는 점을 정리한다", "사람은 앞뒤 말을 함께 읽어 뜻을 가려낸다는 것을 확인한다", "차시 예고: 컴퓨터에게 ‘옆에 나온 말’을 세게 하면?"] }
+    ],
+    wrap: "낱말이 있는지만 세는 컴퓨터는 ‘문맥 살피기’를 하지 않아 추론이 틀린다. 옆 말을 봐야 한다." },
+
+  { id: "l2", no: "3~4차시", app: "app2", title: "낱말 옆에 나온 말을 세어 보자 / 같은 말과 자주 나오면 비슷한 단어일까?",
+    subj: "국어 · 수학 · 실과/정보", who: "점검: AI가 생각을 소리 내어 바꾸며 시범",
+    goals: ["낱말 옆에 나온 말을 단서로 뜻을 짐작하고 근거를 표에서 찾는다", "살펴볼 범위(윈도우)에 따라 단서가 달라짐을 설명한다", "새 문장을 읽고 처음 판단을 유지하거나 고친 이유를 말한다"],
+    steps: [
+      { when: "3차시", items: ["글 읽기 〈새 도서관이 문을 연 날〉: ‘걱정·불안·처음’을 찾아 누르고 가장 비슷한 두 낱말을 고른다", "① 두 ‘사과’의 뜻 가르기: 뜻을 알려 주는 말을 누른다", "② 윈도우 1·2 견주기: 내가 고른 단서가 윈도우 안(✅)인지 밖(❌)인지 본다"],
+        tip: "AI 카드: ‘저는 컴퓨터예요. 낱말의 뜻은 몰라요.’ · 1단계 끝에 문장 틀 1" },
+      { when: "3차시", items: ["③ 도서관 책장 세기: 책 제목 6권에서 바로 옆(1칸) 말을 세어 관계표를 채우고 [정답 확인]", "④ ‘나에게 걱정은 ○○이고, 컴퓨터에게 걱정은 △△이다.’ 문장 틀 채우기"],
+        tip: "연습 낱말 ‘처음’부터 함께 세요. [정답 확인]은 틀린 칸만 표시하고 고치는 건 학생이 해요." },
+      { when: "4차시", items: ["⑤ 세 낱말 모두의 옆에 나온 말(두근두근)을 관계표에서 찾는다", "⑥ 학생이 먼저 고른 뒤, AI가 ‘셋 다 주변에 두근두근이 있어서 비슷하다고 생각해요’라고 근거를 말하는 것을 본다", "글 읽기에서 고른 짝과 견주어 문장 틀 3"],
+        tip: "뜻이 달라도 같은 옆 말이 있으면 비슷하다고 보는 것이 컴퓨터 기준의 한계예요." },
+      { when: "4차시", items: ["⑦ 4분 동안 ‘걱정·불안·처음’이 든 짧은 말을 낱말마다 3개까지 넣는다 → 단어 지도가 움직이고 AI가 ‘아! 생각을 바꿀게요’", "⑧ ‘…내 가슴은 계속 두근거렸다.’ → 까닭 짐작 → 다음 문장을 읽고 유지·수정", "⑨ 생각 나누기: 사람이 정한 것 누르기 + 질문 3개"],
+        tip: "우리 반 낱말은 시트에 모여요. 알맞지 않은 말은 시트 ‘우리반낱말’에서 그 줄을 지우세요." }
+    ],
+    wrap: "컴퓨터는 같은 말과 자주 함께 나오는 단어를 비슷하다고 여겨요. 하지만 뜻까지 같은 것은 아니에요." },
+
+  { id: "l3", no: "5차시", app: "app3", title: "뜻이 여러 개인 낱말의 옆 말을 세어 보자",
+    subj: "국어(문법) · 수학 · 실과/정보", who: "점검: 학생 혼자 점검·수정",
+    goals: ["다의어가 든 글과 어구를 읽고 주변 단어를 근거로 뜻을 짐작한다", "같은 옆 말이 있는 문장끼리 모으면 뜻이 갈라짐을 표로 설명한다", "새 어구를 읽고 처음 고른 뜻을 스스로 점검하고 고친다"],
+    steps: [
+      { items: ["첫 화면에 학교명과 <b>번호(예: 260601)</b>를 적는다 — 앞 네 자리가 같으면 우리 반 투표로 모여요", "글 읽기 〈속상했던 주말〉: 연패·무료·반려·의사 → 처음 짐작(투표) → 주변 단어 밑줄 → 단서 견주기 → 다시 짐작", "새 문장 점검: ‘우리 팀의 연패 기록이 드디어 끝났다.’ → 다음 문장을 읽고 유지·수정", "1단계: 제시 어구 8~9개에서 단서 말을 누르고 뜻 고르기 → 윈도우(양옆 2칸) 켜서 내 단서와 견주기"],
+        tip: "학생 이름은 적지 않아요. 사람이 먼저 읽고 판단한 뒤 컴퓨터를 봐요." },
+      { items: ["① 한 줄로 세기: 컴퓨터는 처음에 모든 문장의 옆 말을 한 줄에 센다", "② 문장마다 펼쳐 같은 옆 말이 있는 줄끼리 붙인다 — 파란 선이 끊긴 곳에서 뜻이 갈라진다", "③ 덩어리마다 한 줄로 합치기 → 문장 틀 2"],
+        tip: "줄은 ▲▼나 끌어서 옮기고 [컴퓨터처럼 모으기]로 확인해요. ★는 내가 고른 단서." },
+      { items: ["단어 지도에서 [옆 말로 나누기] → 칩이 덩어리로 갈라지는 것을 본다", "덩어리마다 <b>뜻 이름표</b>를 붙인다 — 나누는 것은 컴퓨터, 뜻을 정하는 것은 사람", "문장 틀 3"] },
+      { items: ["새 어구(예: 반려 거북이 수조 청소)를 읽고 ① 내가 먼저 뜻을 고른다", "② [컴퓨터는?] — 짐작 / 헷갈려요 / 몰라요", "③ 유지·수정 후 ‘처음에는 ○○라고 생각했는데, △△를 읽고 □□로 고쳤다.’ → 정답 확인"],
+        tip: "점검 어구는 [교사] → 어구 관리에서 골라요. 기록은 시트 ‘앱3 기록’에 저장돼요." }
+    ],
+    wrap: "컴퓨터는 같은 낱말을 처음엔 한 뜻으로 세다가, 옆 말이 이어지는 문장끼리 모아 뜻을 나눈다. 이름표는 사람이 붙인다." },
+
+  { id: "l4", no: "6차시", app: "app3", title: "내가 읽는 방법을 정리하고, 남은 질문을 남기다",
+    subj: "국어 · 실과/정보", who: "정리: 나의 읽기 순서로 일반화",
+    goals: ["뜻을 잘 모르는 낱말을 읽는 나의 순서를 정리한다", "컴퓨터가 뜻을 잘못 고른 사례의 원인을 자료와 설정에서 찾는다", "‘사람이 정한 기준’이 다른 AI 판단에도 적용됨을 말한다"],
+    steps: [
+      { items: ["앱 3 ‘글로 돌아가기’: 〈속상했던 주말〉의 두 ‘연패’를 다시 읽는다", "주변 단어 밑줄 → 다시 짐작해 처음 짐작과 견준다", "‘연패 주변에 ＿＿가 있어서 ＿＿ 뜻이라고 짐작했다.’", "5차시에 컴퓨터가 틀리거나 헷갈린 어구, 내가 고친 어구를 다시 꺼낸다"],
+        tip: "앱 3의 결과 화면과 시트 기록을 함께 봐요." },
+      { items: ["④ 컴퓨터라면 어디서 헷갈릴까? — 양옆 2칸 밖의 단서, ‘반려견’의 ‘견’처럼 낱말 안에 숨은 단서", "잘못 고른 원인 토의: 자료가 적었나? 옆 말이 두 뜻에 같이 나왔나? 처음 보는 말이었나? 단서가 윈도우 밖이었나?"],
+        tip: "‘오류·편향’ 대신 ‘자료가 적어서’ 같은 원인 말로 찾아요." },
+      { items: ["학급 다의어 뜻풀이 모음: 낱말별로 ‘이 뜻일 때 자주 나오는 말’을 근거로 한 문장씩 써서 모으고 발표한다"],
+        tip: "구글 스프레드시트나 캔바로 정리해요." },
+      { items: ["사람이 정한 것 돌아보기(어구 모으기·뜻 표시, 문장 고르기, 윈도우, 뜻 이름표, 뜻의 수)", "네 단계 카드를 순서대로 놓고 ‘다음에 뜻을 모르는 낱말을 만나면, 나는 이렇게 읽을래요.’ → 1차시 문장과 비교", "원리 일반화: 다른 AI 판단에도 적용해 보고 남은 질문 적기 → [내 생각 보내기]"] }
+    ],
+    wrap: "사람은 옆 말과 낱말의 뜻, 내 경험을 함께 생각해 뜻을 가려낸다. 컴퓨터는 같은 말을 찾아 셀 뿐 뜻을 알지 못한다." }
+];
+
+/* ===================================================================== */
+let route = { page: "model" }, curStep = 1, panelHidden = false, connState = "local";
+let teacherPassword = "", teacherLoginError = "", teacherLoginBusy = false;
+let teacherResults = { app1: null, app2: null, app3: null }, teacherResultsBusy = false, teacherResultsError = "", currentResultApp = "app1", teacherResultFilter = "";
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const stageVars = s => `--c:${s.c};--cb:${s.cb}`;
+
+function parseHash() {
+  const h = location.hash.replace(/^#\/?/, "");
+  if (LESSONS.some(l => l.id === h)) return { page: "lesson", id: h };
+  if (h === "teacher") return { page: "teacher" };
+  return { page: "model" };
+}
+function go(page, id) { location.hash = page === "lesson" ? id : page === "model" ? "" : page; }
+window.addEventListener("hashchange", () => { route = parseHash(); curStep = 1; render(); window.scrollTo(0, 0); });
+
+function renderNav() {
+  const on = (p, id) => route.page === p && (!id || route.id === id) ? "on" : "";
+  document.getElementById("nav").innerHTML =
+    `<button class="${on("model")}" onclick="go('model')">모형</button><span class="sep"></span>` +
+    LESSONS.map(l => `<button class="${on("lesson", l.id)}" onclick="go('lesson','${l.id}')">${l.no}</button>`).join("") +
+    `<span class="sep"></span><button class="${on("teacher")}" onclick="go('teacher')">🛠️ 교사</button>` +
+    `<button onclick="location.href='index.html'">학생 화면</button>`;
+}
+
+/* ----- 모형 화면 ----- */
+function renderModel() {
+  return `<div class="wrap">
+    <span class="title-pill">문맥 추론 점검 모형</span>
+    <div class="eq">본질적 질문: 말의 뜻은 어떻게 이해되는가? <small>(원리 1)</small></div>
+    <div class="stages">${STAGES.map(s => `
+      <div class="stage" style="${stageVars(s)}">
+        <div class="head"><small>${s.key}단계</small><b>${s.name}</b></div>
+        <div class="body">
+          <div class="lit-box"><span class="tag lit">문해력</span><p>${s.lit}</p></div>
+          <div class="nlp-box"><span class="tag nlp">자연어처리 원리</span><p>${s.nlp}</p></div>
+          <div class="basis">근거: ${s.basis}</div>
+        </div>
+      </div>`).join("")}</div>
+    <div class="band cmp">단계마다 사람의 근거와 컴퓨터의 근거 견주기 <small>— 판단 근거 비교 원리(1)</small></div>
+    <div class="band move">점검 주체가 옮겨 간다: 학생이 점검 → AI가 시범 → 학생 혼자 <small>— 점검 주체 이양 원리(2)</small></div>
+    <div class="band cycle">↻ 새 문맥을 만나면 1단계로 돌아가 다시 읽고, 정리한 읽기 순서를 다른 글 읽기에 쓴다 (순환)</div>
+    <div class="band media">모형 밖 · 학습 매체: 각 단계에서 학생과 컴퓨터가 하는 일을 눈에 보이게 한다 (교사 제작 실습 앱 3종) — 단계 가시화 매체 원리(6)</div>
+
+    <div class="sec-title">차시 열기</div>
+    <div class="lesson-grid">${LESSONS.map(l => `
+      <button class="lcard" onclick="go('lesson','${l.id}')">
+        <span class="no">${l.no}</span><b>${esc(l.title)}</b>
+        <span class="app">${APPS[l.app].name}</span>
+        <span class="who">${esc(l.who)}</span>
+      </button>`).join("")}</div>
+
+    <div class="sec-title">앱별 4단계 한눈에</div>
+    <div class="flow">
+      <div class="h"></div><div class="h">앱 1 · BoW</div><div class="h">앱 2 · Word2Vec</div><div class="h">앱 3 · 다의어</div>
+      ${[["1 문맥 살피기", "낱말로 나눠 단어 가방에 → 문맥을 살피지 않는 컴퓨터", "두 ‘사과’에서 단서 누르기, 윈도우 1·2 견주기", "어구에서 단서 누르고 뜻 고르기, 윈도우(양옆 2칸) 견주기"],
+         ["2 단서 세기", "있으면 1, 없으면 0", "책 제목 6권에서 옆 말 세어 관계표", "한 줄로 세기 → 펼쳐 모으기 → 덩어리로 갈라짐"],
+         ["3 뜻 추론", "표가 같으면 같은 뜻으로 봄", "공통 옆 말(두근두근)로 셋을 비슷하다고 봄", "덩어리에 사람이 뜻 이름표 붙이기"],
+         ["4 점검·수정", "사자/호랑이: 학생이 컴퓨터를 점검", "우리 반 낱말로 AI가 ‘생각을 바꿀게요’ 시범", "새 어구를 학생 혼자 유지·수정"]]
+        .map((r, i) => `<div class="rowh" style="color:${STAGES[i].c};background:${STAGES[i].cb}">${r[0]}</div><div>${r[1]}</div><div>${r[2]}</div><div>${r[3]}</div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* ----- 차시 화면 ----- */
+function frameHTML(appKey, extraQuery) {
+  const a = APPS[appKey], src = a.src();
+  if (!src) return `<div class="empty"><div class="box"><div style="font-size:40px">🧩</div><h3>${a.name} 주소가 아직 없어요</h3>
+    <p>config.js 의 <code>APP1_URL</code>에 주소를 넣거나, 앱 HTML을 <code>apps/app1.html</code>로 올려 주세요.</p></div></div>`;
+  const full = src + (extraQuery || "");
+  return `<iframe class="app" id="appFrame" src="${esc(full)}" title="${esc(a.title)}" allow="clipboard-write; fullscreen"></iframe>`;
+}
+function renderLesson(l) {
+  const a = APPS[l.app];
+  const remote = /^https?:/.test(a.src());
+  return `<div class="lesson ${panelHidden ? "hide-panel" : ""}">
+    <aside class="panel">
+      <div class="no">${l.no} · ${a.name}</div>
+      <h2>${esc(l.title)}</h2>
+      <div class="meta">${esc(l.subj)} · ${esc(l.who)}</div>
+      <div class="goals"><b>학습 목표</b><ul>${l.goals.map(g => `<li>${esc(g)}</li>`).join("")}</ul></div>
+      <div class="stepper">${STAGES.map(s => `<button style="${stageVars(s)}" class="${curStep === s.key ? "on" : ""}" onclick="setStep(${s.key})">${s.key}. ${s.short.replace("\n", "<br>")}</button>`).join("")}</div>
+      ${l.steps.map((st, i) => { const s = STAGES[i]; return `
+        <div class="step ${curStep === s.key ? "on" : ""}" id="step${s.key}" style="${stageVars(s)}">
+          <h3>${s.key}단계 ${s.name}${st.when ? `<small>${st.when}</small>` : ""}</h3>
+          <ol>${st.items.map(x => `<li>${x}</li>`).join("")}</ol>
+          ${st.tip ? `<div class="tip">※ ${st.tip}</div>` : ""}
+          ${curStep === s.key ? `<div class="pair"><span class="l">문해력 · ${s.lit}</span><span class="n">자연어처리 · ${s.nlp}</span></div>` : ""}
+        </div>`; }).join("")}
+      <div class="wrapup"><b>정리</b>${esc(l.wrap)}</div>
+    </aside>
+    <section class="stage-frame">
+      <div class="frame-bar">
+        <button class="btn" onclick="togglePanel()">${panelHidden ? "📋 수업 흐름 보기" : "⬅ 수업 흐름 접기"}</button>
+        <span class="t">${a.name} · ${esc(a.title)}</span>
+        ${l.app === "app3" ? `<button class="btn" onclick="restartApp()" title="학교명·번호 입력 화면으로">🙋 처음 화면</button>` : ""}
+        <button class="btn" onclick="reloadApp()">↻ 새로 고침</button>
+        <button class="btn" onclick="fullApp()">⛶ 크게</button>
+        ${a.src() ? `<a class="btn" href="${esc(a.src())}" target="_blank" rel="noopener">↗ 새 탭</a>` : ""}
+      </div>
+      ${frameHTML(l.app)}
+      ${remote ? `<div style="font-size:12px;color:#64748b;padding:4px 10px;background:#fff">이 앱은 Apps Script 주소로 열려요. 로그인 화면이 보이면 배포 설정의 액세스를 ‘모든 사용자’로 바꿔 주세요.</div>` : ""}
+    </section>
+  </div>`;
+}
+function setStep(k) {
+  curStep = k;
+  const y = document.querySelector(".panel") ? document.querySelector(".panel").scrollTop : 0;
+  renderPanelOnly();
+  const el = document.getElementById("step" + k); if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+// 패널만 다시 그려서 iframe(학생 진행 상태)은 그대로 둔다
+function renderPanelOnly() {
+  const l = LESSONS.find(x => x.id === route.id), tmp = document.createElement("div");
+  tmp.innerHTML = renderLesson(l);
+  document.querySelector(".panel").replaceWith(tmp.querySelector(".panel"));
+}
+function togglePanel() {
+  panelHidden = !panelHidden;
+  document.querySelector(".lesson").classList.toggle("hide-panel", panelHidden);
+  const b = document.querySelector(".frame-bar .btn"); if (b) b.textContent = panelHidden ? "📋 수업 흐름 보기" : "⬅ 수업 흐름 접기";
+}
+function reloadApp() { const f = document.getElementById("appFrame"); if (f) f.src = f.src; }
+function fullApp() { const f = document.getElementById("appFrame"); if (f && f.requestFullscreen) f.requestFullscreen(); }
+function restartApp() {
+  const f = document.getElementById("appFrame"); if (!f) return;
+  f.src = CFG.API_URL ? "apps/app3.html?start=1" : "apps/app3.html#start";
+}
+
+/* ----- 교사 화면 ----- */
+function callTeacherApi(fn, args) {
+  if (!CFG.API_URL) return Promise.reject(new Error("서버 주소가 없어요. config.js의 API_URL을 설정해 주세요."));
+  return fetch(CFG.API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ fn, args: args || [] })
+  }).then(response => {
+    if (!response.ok) throw new Error(`서버 응답 오류 (${response.status})`);
+    return response.json();
+  }).then(data => {
+    if (!data || !data.ok) throw new Error(data && data.error || "서버 요청에 실패했어요.");
+    return data.result;
+  });
+}
+function renderTeacherGate() {
+  document.querySelector(".top").style.display = "none";
+  const m = document.getElementById("main");
+  m.innerHTML = `<form class="teacher-login" onsubmit="event.preventDefault();loginTeacher()">
+    <div style="font-size:38px">🔐</div><h1>교사용 페이지</h1>
+    <p>학생 결과와 단어 더미 관리는 교사 비밀번호로 로그인해 주세요. 수업 모형과 수업 흐름은 공개 페이지에서 볼 수 있어요.</p>
+    <input id="teacherPw" type="password" autocomplete="current-password" placeholder="교사 비밀번호" ${teacherLoginBusy ? "disabled" : ""}>
+    <button type="submit" ${teacherLoginBusy ? "disabled" : ""}>${teacherLoginBusy ? "확인 중…" : "로그인"}</button>
+    <div class="error">${esc(teacherLoginError)}</div>
+    <a href="teacher.html">수업 모형·수업 흐름 보기</a>
+    <a href="index.html">학생 활동 페이지로</a>
+  </form>`;
+  document.title = "교사용 로그인 · 문맥 추론 점검 모형";
+}
+function loginTeacher() {
+  const password = (document.getElementById("teacherPw") || {}).value || "";
+  if (!password.trim()) { teacherLoginError = "비밀번호를 입력해 주세요."; renderTeacherGate(); return; }
+  teacherLoginBusy = true; teacherLoginError = ""; renderTeacherGate();
+  callTeacherApi("adminLogin", [password]).then(result => {
+    if (!result || !result.ok) throw new Error(result && result.msg || "비밀번호가 맞지 않아요.");
+    teacherPassword = password;
+    teacherLoginBusy = false;
+    route = { page: "teacher" };
+    history.replaceState(null, "", "#teacher");
+    render();
+    checkConn(false);
+    loadTeacherResults();
+  }).catch(error => {
+    teacherLoginBusy = false;
+    teacherLoginError = error && error.message || "로그인하지 못했어요.";
+    renderTeacherGate();
+  });
+}
+function logoutTeacher() {
+  teacherPassword = "";
+  teacherResults = { app1: null, app2: null, app3: null };
+  teacherResultsError = "";
+  route = { page: "model" };
+  history.replaceState(null, "", location.pathname);
+  render();
+}
+function loadTeacherResults() {
+  teacherResultsBusy = true; teacherResultsError = ""; render();
+  Promise.all([
+    callTeacherApi("getApp1Records", [teacherPassword]),
+    callTeacherApi("getApp2Records", [teacherPassword]),
+    callTeacherApi("getApp3Records", [teacherPassword])
+  ]).then(([app1, app2, app3]) => {
+    teacherResults = { app1, app2, app3 };
+  }).catch(error => {
+    teacherResultsError = error && error.message || "결과를 불러오지 못했어요.";
+  }).finally(() => {
+    teacherResultsBusy = false;
+    if (teacherPassword) render();
+  });
+}
+function resultTableHTML() {
+  const data = teacherResults[currentResultApp];
+  if (teacherResultsBusy) return `<p>결과를 불러오는 중…</p>`;
+  if (!data) return `<p class="warn-t">결과를 불러오지 못했어요. ${esc(teacherResultsError)}</p>`;
+  const headers = data.headers || [], query = teacherResultFilter.trim().toLocaleLowerCase();
+  const rows = (data.rows || []).filter(row => !query || row.join(" ").toLocaleLowerCase().includes(query));
+  if (!headers.length) return `<p class="warn-t">결과 열 정보가 없어요. Apps Script를 최신 Code.gs로 다시 배포했는지 확인해 주세요.</p>`;
+  return `<p>전체 ${data.rows.length}건 · 표시 ${rows.length}건</p><div class="result-table"><table>
+    <thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(row => `<tr>${headers.map((_, i) => `<td>${esc(row[i] || "")}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${headers.length}">표시할 결과가 없어요.</td></tr>`}</tbody>
+  </table></div>`;
+}
+function setResultApp(app) { currentResultApp = app; render(); }
+function setTeacherResultFilter(value) {
+  teacherResultFilter = value;
+  const table = document.getElementById("resultTableWrap");
+  if (table) table.innerHTML = resultTableHTML();
+}
+function exportTeacherResults() {
+  const data = teacherResults[currentResultApp];
+  if (!data || !data.headers || !data.headers.length) return;
+  const quote = value => `"${String(value == null ? "" : value).replace(/"/g, '""')}"`;
+  const csv = [data.headers, ...(data.rows || [])].map(row => row.map(quote).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a"); a.href = url; a.download = `${currentResultApp}-results.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function renderTeacher() {
+  const st = connState === "ok" ? `<span class="ok-t">● 연결됨</span>` : connState === "fail" ? `<span class="warn-t">● 연결 안 됨 (주소·배포 확인)</span>` : `<span class="warn-t">● 미리보기 모드 (API_URL 비어 있음 → 이 기기에만 저장)</span>`;
+  return `<div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <h1>🧑‍🏫 교사 대시보드</h1><div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn" href="index.html">학생 화면</a><button class="btn" onclick="logoutTeacher()">로그아웃</button>
+      </div>
+    </div>
+    <div class="tgrid">
+      <div class="card">
+        <h3>🔌 시트 연결 상태</h3>
+        <div class="kv">
+          <span>상태</span><span>${st}</span>
+          <span>API_URL</span><span><code>${esc(CFG.API_URL || "(비어 있음)")}</code></span>
+          <span>앱 1 주소</span><span><code>${esc(CFG.APP1_URL || "(비어 있음)")}</code></span>
+          <span>가명 처리</span><span>${CFG.PSEUDONYMIZE ? "켜짐 — 학교명은 S-xxxxxx 코드로 보내요" : "꺼짐"}</span>
+        </div>
+        <p style="margin-bottom:0"><button class="btn" onclick="checkConn(true)">다시 확인</button></p>
+      </div>
+      <div class="card">
+        <h3>✅ 수업 전 점검</h3>
+        <ul style="margin:0;padding-left:18px">
+          <li>4차시 전: 시트 메뉴 [수업 관리] → 앱 2 ‘우리 반 낱말 모두 지우기’</li>
+          <li>5차시 전: 아래 어구 관리에서 낱말 탭이 모두 ✅인지, 가르치기 문제 2개씩인지</li>
+          <li>학생에게 번호 형식 안내(예: 260601 → 앞 네 자리 2606이 같은 반)</li>
+          <li>학생 이름은 어디에도 적지 않게 안내</li>
+        </ul>
+      </div>
+    </div>
+    <section class="card" style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div><h3>📊 학생 활동 결과</h3><span>학교는 가명으로 저장되고, 학생 이름은 받지 않아요.</span></div>
+        <button class="result-btn" onclick="loadTeacherResults()" ${teacherResultsBusy ? "disabled" : ""}>새로고침</button>
+      </div>
+      ${teacherResultsError ? `<p class="warn-t">결과를 불러오지 못했어요: ${esc(teacherResultsError)}</p>` : ""}
+      <div class="result-tabs">
+        ${[["app1","앱 1 · BoW"],["app2","앱 2 · Word2Vec"],["app3","앱 3 · 다의어"]].map(([key,label]) => `<button class="${currentResultApp === key ? "on" : ""}" onclick="setResultApp('${key}')">${label}${teacherResults[key] ? ` (${teacherResults[key].rows.length})` : ""}</button>`).join("")}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <input type="search" value="${esc(teacherResultFilter)}" placeholder="학교 코드·번호·내용 검색" oninput="setTeacherResultFilter(this.value)" style="flex:1;min-width:220px;padding:8px;border:1px solid var(--line);border-radius:8px">
+        <button class="btn" onclick="exportTeacherResults()">CSV 내려받기</button>
+      </div>
+      <div id="resultTableWrap">${resultTableHTML()}</div>
+    </section>
+    <div class="card" style="margin-top:14px">
+      <h3>🛠️ 단어 더미·앱 3 어구 관리</h3>
+      <p>CSV를 창고에 가져오고, 사용할 어구를 고릅니다. 저장하면 학생 앱에 반영돼요.</p>
+      <a class="btn" href="apps/admin.html" target="_blank" rel="noopener">단어 더미 관리 열기 ↗</a>
+    </div>
+  </div>`;
+}
+
+/* ----- 연결 확인 ----- */
+function setConn(s) {
+  connState = s;
+  const el = document.getElementById("conn");
+  el.className = "conn " + (s === "ok" ? "ok" : "warn");
+  el.textContent = s === "ok" ? "● 시트 연결됨" : s === "fail" ? "● 시트 연결 안 됨" : "● 미리보기(기기 저장)";
+}
+function checkConn(rerender) {
+  if (!CFG.API_URL) { setConn("local"); if (rerender && route.page === "teacher") render(); return; }
+  fetch(CFG.API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ fn: "ping", args: [] }) })
+    .then(r => r.json()).then(d => setConn(d && d.ok ? "ok" : "fail")).catch(() => setConn("fail"))
+    .finally(() => { if (route.page === "teacher") render(); });
+}
+
+function render() {
+  if (route.page === "teacher" && !teacherPassword) { renderTeacherGate(); return; }
+  document.querySelector(".top").style.display = "";
+  renderNav();
+  const m = document.getElementById("main");
+  if (route.page === "lesson") m.innerHTML = renderLesson(LESSONS.find(l => l.id === route.id));
+  else if (route.page === "teacher") m.innerHTML = renderTeacher();
+  else m.innerHTML = renderModel();
+  document.title = (route.page === "lesson" ? LESSONS.find(l => l.id === route.id).no + " · " : "") + "문맥 추론 점검 모형";
+}
+route = parseHash();
+render();
+checkConn(false);
+</script>
+</body>
+</html>

@@ -110,7 +110,6 @@
     const MEANING_COLORS = ["#4f46e5", "#f59e0b", "#16a34a"];
     const GROUP_COLORS = ["#7c3aed", "#0d9488", "#db2777", "#ea580c", "#0891b2", "#65a30d", "#be123c", "#4338ca"];
     const SHORT = ["①", "②", "③"];
-    const MAX_LESSON = 12;   // 2단계에서 줄을 손으로 옮기기 좋은 최대 어구 수
     const MAX_CHECK = 2, BASE_WEIGHT = 2, TEACH_MAX = 3;
     const USES = ["창고", "수업", "점검"];
     const USE_LABEL = { "창고": "창고", "수업": "수업", "점검": "가르치기" };
@@ -148,6 +147,8 @@
     function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
     function tokensOf(text) { return String(text || "").trim().split(/\s+/).map(t => t.replace(/[.,!?~"'“”‘’()\[\]…·:;]/g, "")).filter(Boolean); }
     function isTarget(tok, t) { return tok === t || (tok.startsWith(t) && TARGET_SUFFIX.includes(tok.slice(t.length))); }
+    function isClueWord(w) { return !/^\d+$/u.test(w); }
+    function clueWords(words) { return words.filter(isClueWord); }
     function contextOf(text, t) {
       const toks = tokensOf(text);
       const tIdx = toks.map((x, i) => isTarget(x, t) ? i : -1).filter(i => i >= 0);
@@ -156,25 +157,38 @@
       return { toks, tIdx, ctx };
     }
     function shareWords(a, b) { return [...new Set(a.filter(w => b.includes(w)))]; }
+    function clueScoreTable(list, t) {
+      const meaningCount = MEANINGS[t].length, counts = {};
+      list.forEach(r => contextOf(r.text, t).ctx.filter(isClueWord).forEach(w => {
+        if (!counts[w]) counts[w] = Array(meaningCount).fill(0);
+        if (r.code >= 1 && r.code <= meaningCount) counts[w][r.code - 1]++;
+      }));
+      const table = {};
+      Object.entries(counts).forEach(([w, values]) => {
+        const total = values.reduce((a, b) => a + b, 0);
+        if (total) table[w] = values.map(v => v / total);
+      });
+      return table;
+    }
     function groupsOf(list, t) {
-      const C = list.map(r => contextOf(r.text, t).ctx), n = C.length, p = C.map((_, i) => i);
-      const f = x => p[x] === x ? x : (p[x] = f(p[x]));
-      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (shareWords(C[i], C[j]).length) p[f(i)] = f(j);
-      const map = {}, groups = [];
-      for (let i = 0; i < n; i++) { const r = f(i); if (map[r] == null) { map[r] = groups.length; groups.push([]); } groups[map[r]].push(i); }
-      return { C, groups };
+      const C = list.map(r => clueWords(contextOf(r.text, t).ctx)), table = clueScoreTable(list, t);
+      const groups = MEANINGS[t].map(() => []);
+      C.forEach((ctx, i) => {
+        const scores = MEANINGS[t].map((_, mi) => ctx.reduce((sum, w) => sum + (table[w] ? table[w][mi] : 0), 0));
+        const max = Math.max(...scores), tops = scores.map((score, mi) => score === max ? mi : -1).filter(mi => mi >= 0);
+        const labeled = list[i].code - 1, winner = tops.includes(labeled) ? labeled : tops[0];
+        if (winner >= 0) groups[winner].push(i);
+      });
+      return { C, groups, table };
     }
     function judge(list, t, text) {
-      const { C, groups } = groupsOf(list, t), ctx = contextOf(text, t).ctx;
-      const hits = groups.map(g => [...new Set(ctx.filter(x => g.some(i => C[i].includes(x))))]);
-      const scores = groups.map(g => ctx.reduce((a, x) => a + g.reduce((b, i) => b + C[i].filter(y => y === x).length, 0), 0));
-      const max = Math.max(0, ...scores), tops = scores.map((s, i) => s === max ? i : -1).filter(i => i >= 0);
-      if (!groups.length || max === 0) return { kind: "unknown", ctx };
+      const { table } = groupsOf(list, t), ctx = clueWords(contextOf(text, t).ctx);
+      const hits = MEANINGS[t].map((_, mi) => [...new Set(ctx.filter(w => table[w] && table[w][mi] > 0))]);
+      const scores = MEANINGS[t].map((_, mi) => ctx.reduce((sum, w) => sum + (table[w] ? table[w][mi] : 0), 0));
+      const max = Math.max(0, ...scores), tops = scores.map((score, i) => score === max ? i : -1).filter(i => i >= 0);
+      if (!list.length || max === 0) return { kind: "unknown", ctx };
       if (tops.length > 1) return { kind: "tie", ctx, words: [...new Set(tops.flatMap(i => hits[i]))] };
-      const g = groups[tops[0]], cnt = {};
-      g.forEach(i => { cnt[list[i].code] = (cnt[list[i].code] || 0) + 1; });
-      const code = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
-      return { kind: "pick", ctx, words: hits[tops[0]], code, mixed: Object.keys(cnt).length > 1 };
+      return { kind: "pick", ctx, words: hits[tops[0]], code: tops[0] + 1, mixed: false };
     }
 
     /* ===== 점검 표시 ===== */
@@ -232,12 +246,36 @@
     function markDirty() { dirty = true; saveMsg = ""; }
 
     /* ===== 붙여넣기 ===== */
+    function parseDelimitedRows(text, delimiter) {
+      const input = String(text || "").replace(/^\uFEFF/, "");
+      const result = [], row = [];
+      let field = "", quoted = false;
+      for (let i = 0; i < input.length; i++) {
+        const ch = input[i];
+        if (quoted) {
+          if (ch === '"' && input[i + 1] === '"') { field += '"'; i++; }
+          else if (ch === '"') quoted = false;
+          else field += ch;
+        } else if (ch === '"' && !field) quoted = true;
+        else if (ch === delimiter) { row.push(field.trim()); field = ""; }
+        else if (ch === "\n") {
+          row.push(field.trim().replace(/\r$/, "")); field = "";
+          if (row.some(value => value !== "")) result.push([...row]);
+          row.length = 0;
+        } else field += ch;
+      }
+      if (quoted) throw new Error("CSV 따옴표가 닫히지 않았어요.");
+      row.push(field.trim().replace(/\r$/, ""));
+      if (row.some(value => value !== "")) result.push(row);
+      return result;
+    }
     function parsePaste(text) {
-      const lines = String(text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      if (!lines.length) return { add: [], dup: 0, bad: [] };
-      const split = l => l.includes("\t") ? l.split("\t") : l.split(",");
+      const input = String(text || "").replace(/^\uFEFF/, "");
+      if (!input.trim()) return { add: [], dup: 0, bad: [] };
+      const delimiter = input.split(/\r?\n/, 1)[0].includes("\t") ? "\t" : ",";
+      const table = parseDelimitedRows(input, delimiter);
       let cols = null, start = 0;
-      const head = split(lines[0]).map(x => x.trim());
+      const head = table[0].map(x => x.trim());
       if (head.some(h => /어구|문장|단어|낱말|뜻/.test(h))) {
         const find = re => head.findIndex(h => re.test(h));
         cols = { cls: find(/^반$/), group: find(/모둠/), word: find(/단어|낱말/), code: find(/뜻/), text: find(/어구|문장/) };
@@ -246,17 +284,17 @@
       const add = [], bad = [];
       let dup = 0;
       const seen = new Set(rows.map(r => r.word + "|" + norm(r.text)));
-      for (let k = start; k < lines.length; k++) {
-        const c = split(lines[k]).map(x => x.trim());
+      for (let k = start; k < table.length; k++) {
+        const c = table[k];
         let o;
         if (cols) o = { cls: c[cols.cls] || "", group: c[cols.group] || "", word: c[cols.word] || "", code: c[cols.code] || "", text: c[cols.text] || "" };
         else if (c.length >= 5) o = { cls: c[0], group: c[1], word: c[2], code: c[3], text: c.slice(4).join(" ") };
         else if (c.length === 3) o = { cls: "", group: "", word: c[0], code: c[1], text: c[2] };
-        else { bad.push(lines[k]); continue; }
+        else { bad.push(c.join(delimiter)); continue; }
         const codeStr = String(o.code).replace(/\s/g, "");
         if (!o.word) o.word = TARGETS.find(t => codeStr.startsWith(t)) || "";
         const num = Number((codeStr.match(/(\d+)\s*$/) || [])[1]);
-        if (!TARGETS.includes(o.word) || !num || !o.text) { bad.push(lines[k]); continue; }
+        if (!TARGETS.includes(o.word) || !num || !o.text) { bad.push(c.join(delimiter)); continue; }
         const key = o.word + "|" + norm(o.text);
         if (seen.has(key)) { dup++; continue; }
         seen.add(key);
@@ -264,7 +302,19 @@
       }
       return { add, dup, bad };
     }
-    function previewPaste() { pasteText = (document.getElementById("paste") || {}).value || ""; pastePreview = parsePaste(pasteText); render(); }
+    function previewPaste() { pasteText = (document.getElementById("paste") || {}).value || ""; try { pastePreview = parsePaste(pasteText); } catch (e) { saveMsg = `⚠️ ${e.message}`; } render(); }
+    function loadCsvFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onerror = () => { saveMsg = "⚠️ CSV 파일을 읽지 못했어요."; render(); };
+      reader.onload = () => {
+        pasteText = String(reader.result || "");
+        try { pastePreview = parsePaste(pasteText); saveMsg = `CSV ${file.name}을 읽었어요. 미리보기 후 창고에 넣어 주세요.`; }
+        catch (e) { pastePreview = null; saveMsg = `⚠️ ${e.message}`; }
+        render();
+      };
+      reader.readAsText(file, "UTF-8");
+    }
     function confirmPaste() {
       if (!pastePreview || !pastePreview.add.length) return;
       rows = rows.concat(pastePreview.add);
@@ -324,39 +374,21 @@
     }
     function analyze(t) {
       const list = lessonRows(t), { C, groups } = groupsOf(list, t), nM = MEANINGS[t].length;
-      const info = groups.map(g => {
-        const codes = [...new Set(g.map(i => list[i].code))];
-        const bridges = [];
-        if (codes.length > 1) {
-          for (let a = 0; a < g.length; a++) for (let b = a + 1; b < g.length; b++) {
-            const i = g[a], j = g[b];
-            if (list[i].code === list[j].code) continue;
-            const w = shareWords(C[i], C[j]);
-            if (w.length) bridges.push({ w, a: list[i], b: list[j] });
-          }
-        }
-        return { g, codes, bridges };
-      });
+      const info = groups.map(g => ({ g, codes: [...new Set(g.map(i => list[i].code))], bridges: [] }));
       const problems = [];
       const usedCodes = new Set(list.map(r => r.code));
       for (let k = 1; k <= nM; k++) if (!usedCodes.has(k)) problems.push(`${SHORT[k - 1]} '${MEANINGS[t][k - 1]}' 뜻의 수업 어구가 없어요.`);
-      if (list.length < 4) problems.push("수업 어구가 너무 적어요. 뜻마다 3~4개가 좋아요.");
-      if (list.length > MAX_LESSON) problems.push(`수업 어구가 ${list.length}개예요. 2단계에서 줄을 손으로 옮기려면 ${MAX_LESSON}개 이하가 좋아요.`);
-      if (info.some(x => x.codes.length > 1)) problems.push("여러 뜻이 섞인 덩어리가 있어요. 빨간 '다리 말'이 든 어구를 창고로 빼 보세요.");
-      if (groups.length > nM) problems.push(`덩어리가 ${groups.length}개로 쪼개졌어요(뜻은 ${nM}개). 같은 뜻 어구끼리 옆 말이 하나 이상 겹쳐야 이어져요.`);
       if (!checkRows(t).length) problems.push("4단계 '컴퓨터 가르치기' 문제가 없어요. 컴퓨터가 틀리는 어구 1~2개를 '가르치기'로 골라 주세요.");
-      const ready = !problems.length && groups.length === nM;
+      const ready = !problems.length && groups.every(g => g.length > 0);
       return { list, C, groups, info, problems, ready };
     }
-    // 창고 어구를 수업에 넣으면 어떻게 될까?
+    // 창고 어구를 수업에 넣었을 때 뜻별 단서 점수로 어디에 분류될까?
     function effectOf(r, A) {
       if (!usable(r)) return "";
-      const t = r.word, ctx = contextOf(r.text, t).ctx;
-      const touched = A.groups.map((g, gi) => ({ gi, w: [...new Set(ctx.filter(x => g.some(i => A.C[i].includes(x))))] })).filter(x => x.w.length);
-      if (!touched.length) return `<span class="effect" style="color:#64748b">➖ 혼자 떨어져요</span>`;
-      const codes = new Set(touched.flatMap(x => A.groups[x.gi].map(i => A.list[i].code)));
-      if (touched.length > 1 || [...codes].some(c => c !== r.code)) return `<span class="effect" style="color:#dc2626">⚠️ 다른 뜻과 이어져요 (${touched.flatMap(x => x.w).map(esc).join(", ")})</span>`;
-      return `<span class="effect" style="color:#16a34a">🔗 같은 뜻과 이어져요 (${touched[0].w.map(esc).join(", ")})</span>`;
+      const j = judge(A.list, r.word, r.text);
+      if (j.kind === "unknown") return `<span class="effect" style="color:#64748b">➖ 단서가 없어 판단할 수 없어요</span>`;
+      if (j.kind === "tie") return `<span class="effect" style="color:#d97706">🤖 헷갈려요 (${j.words.map(esc).join(", ")})</span>`;
+      return `<span class="effect" style="color:${j.code === r.code ? "#16a34a" : "#dc2626"}">🤖 ${SHORT[j.code - 1]}일 것 같아요 ${j.code === r.code ? "⭕" : "❌"} (${j.words.map(esc).join(", ")})</span>`;
     }
     function judgeLabel(t, A, text, code) {
       const j = judge(A.list, t, text);
@@ -446,7 +478,7 @@
 
         <details class="card help"><summary>❓ 처음이라면 — 이렇게 써요</summary>
           <ol>
-            <li><b>붙여넣기:</b> 엑셀·구글 시트에서 <b>반·모둠·단어·뜻코드·어구</b> 칸을 머리글째 복사해 아래 칸에 붙여넣어요. 새 어구는 모두 <b>창고</b>에 들어가요.</li>
+            <li><b>가져오기:</b> CSV 파일을 선택하거나 엑셀·구글 시트에서 <b>반·모둠·단어·뜻코드·어구</b> 칸을 머리글째 복사해 붙여넣어요. 새 어구는 모두 <b>창고</b>에 들어가며, 저장 전 중복과 읽지 못한 줄을 확인할 수 있어요.</li>
             <li><b>고르기:</b> 낱말 탭에서 어구마다 <b>수업</b>(1~3단계에 나옴) 또는 <b>가르치기</b>(4단계 '컴퓨터 가르치기' 문제, 2개까지)를 눌러요. 가르치기 문제는 <b>컴퓨터가 뜻을 틀리게 고르는 어구</b>가 좋아요. 오른쪽에서 컴퓨터가 어떻게 나누는지 바로 보여요.</li>
             <li><b>맞추기:</b> 오른쪽이 <b>✅</b>가 될 때까지 어구를 넣고 빼요. 창고 어구 옆의 <b>🔗 / ⚠️ / ➖</b>는 그 어구를 수업에 넣으면 어떻게 되는지 알려 줘요.</li>
             <li><b>저장:</b> 아래 <b>[💾 저장]</b>을 눌러야 학생 앱에 반영돼요. ✅가 아닌 낱말은 학생 앱이 원래 예시 어구를 써요.</li>
@@ -455,7 +487,10 @@
         </details>
 
         <div class="card">
-          <h2>📥 어구 붙여넣기</h2>
+          <h2>📥 단어 더미 가져오기</h2>
+          <input id="csvFile" type="file" accept=".csv,text/csv" style="display:none" onchange="loadCsvFile(this.files[0])">
+          <button class="btn" type="button" onclick="document.getElementById('csvFile').click()">CSV 파일 선택</button>
+          <p class="note">열 제목: 반, 모둠, 단어, 뜻코드, 어구. 가져온 자료는 창고에 추가되고 학생 앱에는 자동 적용되지 않아요.</p>
           <textarea id="paste" placeholder="반	모둠	단어	뜻코드	어구&#10;102	6	연패	연패1	3년 연패 탈출">${esc(pasteText)}</textarea>
           <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
             <button class="btn primary" onclick="previewPaste()">표로 읽기</button>
@@ -496,11 +531,11 @@
             <div class="card">
               <h2>🤖 컴퓨터는 수업 어구 ${A.list.length}개를 이렇게 나눠요</h2>
               ${A.ready
-                ? `<div class="status ok">✅ 덩어리 ${A.groups.length}개, 뜻마다 하나씩 나뉘어요. 수업에 쓸 수 있어요.</div>`
+                ? `<div class="status ok">✅ 뜻별 단서 점수로 ${A.groups.length}개 덩어리로 분류해요. 어구 ${A.list.length}개를 모두 계산에 써요.</div>`
                 : `<div class="status warn">⚠️ 아직 학생 앱에 쓰기 어려워요. (저장해도 이 낱말은 원래 예시 어구가 나와요)<ul>${A.problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`}
               ${A.info.map((x, gi) => `
                 <div class="group" style="border-color:${GROUP_COLORS[gi % GROUP_COLORS.length]}">
-                  <h4><span class="pill" style="background:${GROUP_COLORS[gi % GROUP_COLORS.length]}">덩어리 ${gi + 1}</span> 어구 ${x.g.length}개 ${x.codes.length > 1 ? `<span class="flag bad">⛔ 뜻 ${x.codes.length}개가 섞였어요</span>` : codePill(t, x.codes[0])}</h4>
+                  <h4><span class="pill" style="background:${GROUP_COLORS[gi % GROUP_COLORS.length]}">덩어리 ${gi + 1}</span> 어구 ${x.g.length}개 ${x.codes.length > 1 ? `<span class="flag warn">이름표 ${x.codes.map(c => SHORT[c - 1]).join("·")} 어구가 함께 분류됨</span>` : codePill(t, x.codes[0])}</h4>
                   <ul>${x.g.map(i => `<li>${phraseHTML(t, A.list[i].text)} ${x.codes.length > 1 ? codePill(t, A.list[i].code) : ""}</li>`).join("")}</ul>
                   ${x.bridges.slice(0, 4).map(b => `<div class="bridge">🌉 다리 말 <b>${b.w.map(esc).join(", ")}</b>: “${esc(b.a.text)}” ${SHORT[b.a.code - 1]} ↔ “${esc(b.b.text)}” ${SHORT[b.b.code - 1]}</div>`).join("")}
                 </div>`).join("") || `<p class="note">수업 어구를 고르면 여기에 덩어리가 나와요.</p>`}
