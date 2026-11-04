@@ -1139,8 +1139,8 @@
          아직 고르지 않았거나 시트를 못 읽으면 아래 어구를 그대로 씁니다.
        - meanings : 뜻 이름표 (학생이 고르는 보기, 뜻코드 1·2·3 = A·B·C)
        - sentences: 제시 문장 (m = 그 문장에서 쓰인 뜻의 id)
-       - checks   : 4단계 '새 어구 점검' 어구 2개 — 학생이 먼저 뜻을 고른 뒤 컴퓨터의 판단(짐작 · 헷갈려요 · 모르겠어요)을 봄
-                    컴퓨터는 1~3단계 문장으로 나눈 덩어리를 보고 판단하므로, 서로 다른 장면이 나오는 어구를 고르면 좋음
+       - checks   : 4단계 '컴퓨터 가르치기' 점검 어구 2개 — 학생이 먼저 뜻을 짐작한 뒤, 뜻 이름표를 붙인 새 어구로 컴퓨터를 가르침
+                    컴퓨터는 모든 이름표가 붙은 어구의 옆 말 점수를 계산해 실제 뜻 이름으로 새 어구를 판단함
        ※ 문장은 띄어쓰기로 나누어 셉니다. 목표 낱말은 조사 없이 따로 쓰고('무료한'은 알아봄),
          옆 말에도 조사를 붙이지 않습니다. 같은 뜻 문장끼리는 옆 말이 하나 이상 겹치게 만들어 주세요.
        ===================================================================== */
@@ -1256,7 +1256,7 @@
         order: {},      // order[낱말] = 줄 순서
         split: {},      // split[낱말] = 지도에서 나눴는지
         names: {},      // names[낱말][덩어리] = 뜻 id (학생이 붙인 이름표)
-        check4: {},     // check4[낱말] = { cur, items: { 어구번호: { first, revealed, keep, final, why, checked } } }  (4단계 새 어구 점검)
+        check4: {},     // check4[낱말] = { cur, items: { 어구번호: { first, revealed, examples, draft, teachMeaning, checked } } } (4단계 컴퓨터 가르치기)
         human: {}, frames: {}, cardSeen: {}, chipPositions: {},
         lexSig: {},    // lexSig[낱말] = 지금 쓰는 어구 묶음 (바뀌면 그 낱말 기록을 새로 시작)
         wrap: {}       // 마무리: 나의 읽기 순서
@@ -1382,17 +1382,42 @@
     function groupOf(t, i) { return computeGroups(t).findIndex(g => g.includes(i)); }
     function groupWords(t, gi) { const C = sentCtx(t); const w = {}; computeGroups(t)[gi].forEach(i => C[i].forEach(x => { w[x] = (w[x] || 0) + 1; })); return w; }
 
-    // 새 문장 판단: 옆 말이 겹치는 덩어리를 고른다 (점수는 화면에 보이지 않음)
-    function judgeNew(t, text) {
-      const ctx = contextOf(text, t).ctx;
-      const groups = computeGroups(t);
-      const scores = groups.map((g, gi) => { const w = groupWords(t, gi); return ctx.reduce((a, x) => a + (w[x] || 0), 0); });
-      const hits = groups.map((g, gi) => { const w = groupWords(t, gi); return ctx.filter(x => w[x]); });
-      const max = Math.max(...scores);
-      const tops = scores.map((s, i) => s === max ? i : -1).filter(i => i >= 0);
-      if (max === 0) return { kind: "unknown", ctx, scores, hits };
+    function isNumericClue(word) { return /^\d+(?:[.,]\d+)*$/.test(word); }
+    function clueScoreTable(t, added = []) {
+      const counts = {};
+      [...LEXICON[t].sentences, ...added].forEach(example => {
+        contextOf(example.text, t).ctx.filter(w => !isNumericClue(w)).forEach(word => {
+          if (!counts[word]) counts[word] = {};
+          counts[word][example.m] = (counts[word][example.m] || 0) + 1;
+        });
+      });
+      const table = {};
+      Object.entries(counts).forEach(([word, byMeaning]) => {
+        const total = Object.values(byMeaning).reduce((sum, count) => sum + count, 0);
+        table[word] = Object.fromEntries(Object.entries(byMeaning).map(([id, count]) => [id, count / total]));
+      });
+      return table;
+    }
+
+    // Each known clue casts a fractional vote based on the meanings it appeared with.
+    function judgeNew(t, text, added = []) {
+      const ctx = contextOf(text, t).ctx.filter(w => !isNumericClue(w));
+      const table = clueScoreTable(t, added);
+      const scores = Object.fromEntries(LEXICON[t].meanings.map(m => [m.id, 0]));
+      const hits = Object.fromEntries(LEXICON[t].meanings.map(m => [m.id, []]));
+      ctx.forEach(word => {
+        const votes = table[word];
+        if (!votes) return;
+        Object.entries(votes).forEach(([id, vote]) => {
+          scores[id] += vote;
+          if (vote > 0) hits[id].push(word);
+        });
+      });
+      const max = Math.max(...Object.values(scores));
+      const tops = Object.keys(scores).filter(id => Math.abs(scores[id] - max) < 1e-9);
+      if (max === 0) return { kind: "unknown", ctx, scores, hits, tops: [] };
       if (tops.length > 1) return { kind: "tie", ctx, scores, hits, tops };
-      return { kind: "pick", group: tops[0], ctx, scores, hits };
+      return { kind: "pick", meaning: tops[0], ctx, scores, hits, tops };
     }
 
     function meaningInfo(t, id) { const ms = LEXICON[t].meanings; const i = ms.findIndex(m => m.id === id); return i < 0 ? null : { ...ms[i], short: SHORT[i], color: MEANING_COLORS[i] }; }
@@ -2052,75 +2077,84 @@
     // 받침에 따라 조사 고르기: josa('입장', '을', '를') → '을'
     function josa(word, a, b) { const c = String(word || "").slice(-1).charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return b; return (c - 0xAC00) % 28 ? a : b; }
 
-    /* ----- 4단계 새 어구 점검 (계획서 5차시 4단계, 설계원리 2: 학생 혼자 점검·수정) -----
-       ① 내가 먼저 뜻을 고른다 → ② [컴퓨터는?] 컴퓨터의 판단을 본다
-       (본 적 있는 옆 말 → "○○ 문장들에서 본 적이 있어서 ○○일 것 같아요" / 여러 덩어리 → "헷갈려요" / 처음 보는 말 → "모르겠어요")
-       → ③ 내 생각을 그대로 둘지 고칠지 정하고 근거를 쓴다 → 정답 확인 (나 ✅/❌, 컴퓨터 ✅/❌/못 고름) */
-    function chkOf(t) { const c = state.check4[t] || (state.check4[t] = {}); if (!c.items) { c.items = {}; c.cur = 0; } return c; }
+    /* ----- 4단계: 새 어구를 뜻표와 함께 추가해 컴퓨터를 가르친다 ----- */
+    function chkOf(t) {
+      const c = state.check4[t] || (state.check4[t] = {});
+      if (!c.items) { c.items = {}; c.cur = 0; }
+      if (c.v !== 3) {
+        Object.values(c.items).forEach(it => {
+          delete it.keep;
+          delete it.final;
+          delete it.evidence;
+          delete it.why;
+          delete it.checked;
+          if (!Array.isArray(it.examples)) it.examples = [];
+        });
+        c.v = 3;
+      }
+      return c;
+    }
     function chkItem(t, i) { const c = chkOf(t); return c.items[i] || (c.items[i] = {}); }
     function curChk() {
       const t = state.currentTarget, c = chkOf(t), i = Math.max(0, Math.min(c.cur || 0, LEXICON[t].checks.length - 1));
       return { t, i, s: LEXICON[t].checks[i], it: chkItem(t, i) };
     }
-    // 덩어리가 실제로 어떤 뜻의 문장으로 이루어졌는지 (정답 확인에만 씀. 컴퓨터는 이것을 모른다)
-    function groupTrueMeaning(t, gi) {
-      const cnt = {};
-      (computeGroups(t)[gi] || []).forEach(i => { const m = LEXICON[t].sentences[i].m; cnt[m] = (cnt[m] || 0) + 1; });
-      return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || null;
+    function predictionLabel(t, j) {
+      if (j.kind === "unknown") return "모르겠어요";
+      if (j.kind === "tie") return "헷갈려요";
+      const m = meaningInfo(t, j.meaning);
+      return m ? `${m.short} ${m.name}` : "판단할 수 없어요";
     }
-    // 덩어리 이름: 3단계에서 학생이 붙인 뜻 이름표가 있으면 그것, 없으면 '덩어리 가'
-    function groupCall(t, gi) { const mi = meaningInfo(t, (state.names[t] || {})[gi]); return mi ? `'${mi.name}'` : `덩어리 ${GROUP_NAMES[gi]}`; }
-    function computerSays(t, text) {
-      const j = judgeNew(t, text), q = ws => [...new Set(ws)].map(w => `'${esc(w)}'`).join(", ");
-      if (j.kind === "unknown") return { j, html: `옆 말 ${q(j.ctx) || "없음"}은(는) 처음 봐요. 그래서 <b>모르겠어요.</b>` };
-      if (j.kind === "tie") return { j, html: `${q(j.tops.flatMap(g => j.hits[g]))}을(를) ${j.tops.map(g => groupCall(t, g)).join(" · ")} 문장들에서 모두 봤어요. 그래서 <b>헷갈려요.</b>` };
-      return { j, html: `${q(j.hits[j.group])}을(를) ${groupCall(t, j.group)} 문장들에서 본 적이 있어요. 그래서 <b>${groupCall(t, j.group)}일 것 같아요.</b>` };
+    function scoreSummary(t, j) {
+      const total = Object.values(j.scores).reduce((sum, score) => sum + score, 0);
+      if (!total) return "단서 점수 없음";
+      return LEXICON[t].meanings.map((m, i) => `${SHORT[i]} ${m.name} ${j.scores[m.id].toFixed(2)}표 (${Math.round(j.scores[m.id] / total * 100)}%)`).join(" · ");
     }
-    function chkFinalMeaning(it) { return it.keep === "keep" ? it.first : it.keep === "change" ? it.final : null; }
+    function modelSnapshot(j) { return { kind: j.kind, meaning: j.meaning || null, scores: j.scores }; }
     let chkErr = "";
     function renderStage4() {
       const { t, i: cur, s, it } = curChk(), L = LEXICON[t];
       if (!s) return `${headerHTML(4)}${toolsHTML()}<section class="class-panel"><p class="rule-note">이 낱말에는 점검 어구가 없어요.</p></section>`;
-      const c = it.revealed ? computerSays(t, s.text) : null, finalM = chkFinalMeaning(it), ctx = contextOf(s.text, t);
+      const examples = Array.isArray(it.examples) ? it.examples : [];
+      const base = judgeNew(t, s.text), current = judgeNew(t, s.text, examples);
+      const ctx = contextOf(s.text, t);
       const sent = ctx.toks.map((x, k) => ctx.tIdx.includes(k) ? `<span class="tok is-target">${esc(x)}</span>`
         : `<span class="tok ${it.revealed && ctx.ctxIdx.has(k) ? "in-win" : ""}" style="cursor:default">${esc(x)}</span>`).join(" ");
-      const mBtns = (field, fn, off) => L.meanings.map((m, mi) => { const on = it[field] === m.id;
-        return `<button type="button" class="m-btn ${on ? "on" : ""}" style="${on ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="${fn}('${m.id}')" ${off ? "disabled" : ""}>${SHORT[mi]} ${esc(m.name)}</button>`; }).join("");
-      const dot = k => { const x = chkItem(t, k); return x.checked ? (chkFinalMeaning(x) === L.checks[k].m ? " ⭕" : " ❌") : ""; };
+      const mBtns = L.meanings.map((m, mi) => `<button type="button" class="m-btn ${it.teachMeaning === m.id ? "on" : ""}" style="${it.teachMeaning === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="chkTeachMeaning('${m.id}')" ${it.checked ? "disabled" : ""}>${SHORT[mi]} ${esc(m.name)}</button>`).join("");
+      const dot = k => { const x = chkItem(t, k); return x.checked ? (judgeNew(t, L.checks[k].text, x.examples || []).meaning === L.checks[k].m ? " ⭕" : " ❌") : ""; };
       let result = "";
-      if (it.checked && c) {
-        const meOk = finalM === s.m, cm = c.j.kind === "pick" ? groupTrueMeaning(t, c.j.group) : null;
-        const comp = c.j.kind !== "pick" ? "못 고름" : cm === s.m ? "✅" : "❌";
+      if (it.checked) {
+        const comp = current.kind === "pick"
+          ? current.meaning === s.m ? "정답과 일치 ✅" : "다른 뜻으로 판단 ❌"
+          : current.kind === "tie" ? "점수가 같아 뜻을 못 골랐어요" : "근거 단서가 없어 뜻을 못 골랐어요";
         result = `<div class="teach-end">정답: ${pill(t, s.m)}</div>
-          <div class="q-result ${meOk ? "ok" : ""}">나 ${meOk ? "✅" : "❌"} · 컴퓨터 ${comp}</div>
-          ${comp !== "✅" ? `<p class="rule-note">컴퓨터가 ${comp === "❌" ? "틀린" : "고르지 못한"} 까닭은 6차시에 함께 찾아봐요. (자료가 적어서? 옆 말이 두 뜻에 같이 나와서? 처음 보는 말이라서?)</p>` : ""}`;
+          <div class="q-result ${current.kind === "pick" && current.meaning === s.m ? "ok" : ""}">내 첫 짐작: ${pill(t, it.first)}<br>컴퓨터: 학습 전 ${esc(predictionLabel(t, base))} → 학습 후 ${esc(predictionLabel(t, current))}<br>${esc(comp)}</div>
+          <p class="rule-note">내가 가르친 어구 ${examples.length}개 · 학습 후 점수: ${esc(scoreSummary(t, current))}</p>`;
       }
       return `${headerHTML(4)}${toolsHTML()}
         <section class="class-panel">
           <div class="class-head"><div>
             <span class="class-badge">4단계 추론 점검·수정하기</span>
-            <h2>새 어구 점검</h2></div></div>
+            <h2>컴퓨터 가르치기</h2></div></div>
           <div class="duel-dots">${L.checks.map((x, k) => `<button type="button" class="duel-dot ${k === cur ? "now" : ""}" onclick="chkGo(${k})">어구 ${k + 1}${dot(k)}</button>`).join("")}</div>
           <div class="check-card">
-            <div class="q-lead">컴퓨터가 처음 보는 어구예요. 내가 먼저 읽고 판단한 뒤, 컴퓨터의 판단과 견주어 내 생각을 점검해요.</div>
+            <div class="q-lead">먼저 뜻을 짐작한 뒤, 뜻이 분명한 어구와 뜻 이름표를 넣어 컴퓨터를 가르쳐요. 컴퓨터의 판단이 어떻게 달라지는지 확인해요.</div>
             <div class="q-data"><div><span class="q-key">어구</span> ${sent}</div></div>
             <div class="q-ask">① '${esc(t)}'의 뜻을 먼저 고르세요.</div>
-            <div class="m-pick">${mBtns("first", "chkFirst", it.revealed)}</div>
+            <div class="m-pick">${L.meanings.map((m, mi) => `<button type="button" class="m-btn ${it.first === m.id ? "on" : ""}" style="${it.first === m.id ? `background:${MEANING_COLORS[mi]};border-color:${MEANING_COLORS[mi]}` : ""}" onclick="chkFirst('${m.id}')" ${it.revealed ? "disabled" : ""}>${SHORT[mi]} ${esc(m.name)}</button>`).join("")}</div>
             ${it.first && !it.revealed ? `<button type="button" class="big-btn" style="margin-top:10px" onclick="chkReveal()">② 🤖 컴퓨터는?</button>` : ""}
-            ${c ? `
-              <div class="ai-card" style="animation:none; margin-top:12px"><div class="face">🤖</div><div class="say">${c.html}<br><small>밑줄은 제가 보는 옆 말이에요 (양옆 ${WINDOW}칸).</small></div></div>
-              <div class="q-ask">③ 내 생각을 그대로 둘까요, 고칠까요?</div>
-              <div class="m-pick">
-                <button type="button" class="m-btn ${it.keep === "keep" ? "on" : ""}" style="${it.keep === "keep" ? "background:#0f172a;border-color:#0f172a" : ""}" onclick="chkKeep('keep')" ${it.checked ? "disabled" : ""}>그대로 둘래요</button>
-                <button type="button" class="m-btn ${it.keep === "change" ? "on" : ""}" style="${it.keep === "change" ? "background:#0f172a;border-color:#0f172a" : ""}" onclick="chkKeep('change')" ${it.checked ? "disabled" : ""}>고칠래요</button>
-              </div>
-              ${it.keep === "change" ? `<div class="m-pick" style="margin-top:8px">${mBtns("final", "chkFinal", it.checked)}</div>` : ""}
-              ${finalM ? `
-                <div class="q-ask">까닭을 문장 틀에 맞춰 써요.</div>
-                <div class="frame-tpl">${esc(FRAMES[4])}</div>
-                <textarea class="why-input" id="chkWhy" rows="2" placeholder="${esc(FRAMES[4])}" oninput="chkWhyInput(this.value)" ${it.checked ? "disabled" : ""}>${esc(it.why || "")}</textarea>
-                ${it.checked ? "" : `<button type="button" class="big-btn" style="margin-top:10px" onclick="chkCheck()">정답 확인</button>`}
-                <div class="teach-err">${esc(chkErr)}</div>` : ""}
+            ${it.revealed ? `
+              <div class="ai-card" style="animation:none; margin-top:12px"><div class="face">🤖</div><div class="say">학습 전 제 판단은 <b>${esc(predictionLabel(t, base))}</b>이에요.<br><small>점수: ${esc(scoreSummary(t, base))}</small></div></div>
+              <div class="q-ask">③ '${esc(t)}'가 들어간 어구를 쓰고, 그 어구에서 쓰인 뜻을 골라 컴퓨터를 가르치세요.</div>
+              <input class="teach-input" id="teachExample" value="${esc(it.draft || "")}" placeholder="예: ${esc(t)}를 넣은 짧은 어구" oninput="chkTeachDraft(this.value)" ${it.checked ? "disabled" : ""}>
+              <div class="m-pick" style="margin-top:8px">${mBtns}</div>
+              ${it.checked ? "" : `<button type="button" class="big-btn" style="margin-top:10px" onclick="chkAddTraining()">이 어구로 컴퓨터 가르치기</button>`}
+              <div class="teach-err">${esc(chkErr)}</div>
+              ${examples.length ? `<div class="step-title">내가 가르친 어구와 컴퓨터의 변화</div>
+                ${examples.map((ex, ei) => `<div class="occ-row"><div class="occ-no">${ei + 1}. ${sentHTML(t, ex.text)} → ${pill(t, ex.m)}</div>
+                  <div class="rule-note">학습 전: ${esc(predictionLabel(t, ex.before))} · 학습 후: ${esc(predictionLabel(t, ex.after))}<br>점수 변화: ${esc(scoreSummary(t, ex.before))} → ${esc(scoreSummary(t, ex.after))}</div></div>`).join("")}
+                <p class="rule-note">현재 컴퓨터 판단: <b>${esc(predictionLabel(t, current))}</b> · ${esc(scoreSummary(t, current))}</p>` : ""}
+              ${examples.length && !it.checked ? `<button type="button" class="big-btn light" style="margin-top:10px" onclick="chkCheck()">학습을 마치고 정답 확인</button>` : ""}
               ${result}
               ${it.checked && cur < L.checks.length - 1 ? `<button type="button" class="big-btn" style="margin-top:10px" onclick="chkGo(${cur + 1})">다음 어구 →</button>` : ""}` : ""}
           </div>
@@ -2129,13 +2163,29 @@
     }
     function chkFirst(id) { const { it } = curChk(); if (it.revealed) return; it.first = it.first === id ? null : id; saveState(); keepScrollRender(); }
     function chkReveal() { const { it } = curChk(); if (!it.first) return; it.revealed = true; saveState(); keepScrollRender(); }
-    function chkKeep(v) { const { it } = curChk(); if (it.checked) return; it.keep = v; if (v === "keep") it.final = null; chkErr = ""; saveState(); keepScrollRender(); }
-    function chkFinal(id) { const { it } = curChk(); if (it.checked) return; it.final = id; chkErr = ""; saveState(); keepScrollRender(); }
-    function chkWhyInput(v) { curChk().it.why = v; saveState(); }
+    function chkTeachDraft(value) { curChk().it.draft = value; saveState(); }
+    function chkTeachMeaning(id) { const { it } = curChk(); if (it.checked) return; it.teachMeaning = it.teachMeaning === id ? null : id; saveState(); keepScrollRender(); }
+    function chkAddTraining() {
+      const { t, s, it } = curChk();
+      const text = String(it.draft || "").trim();
+      const ctx = contextOf(text, t).ctx.filter(w => !isNumericClue(w));
+      if (it.checked) return;
+      if (!text || !contextOf(text, t).tIdx.length) { chkErr = `'${t}'이 들어간 어구를 써 주세요.`; keepScrollRender(); return; }
+      if (!ctx.length) { chkErr = "숫자 말고 뜻을 알려 주는 옆 말도 넣어 주세요."; keepScrollRender(); return; }
+      if (!it.teachMeaning) { chkErr = `이 어구에서 '${t}'가 어떤 뜻인지 골라 주세요.`; keepScrollRender(); return; }
+      const before = judgeNew(t, s.text, it.examples || []);
+      const example = { text, m: it.teachMeaning };
+      it.examples = [...(it.examples || []), example];
+      const after = judgeNew(t, s.text, it.examples);
+      example.before = modelSnapshot(before);
+      example.after = modelSnapshot(after);
+      it.draft = "";
+      it.teachMeaning = null;
+      chkErr = ""; saveState(); keepScrollRender();
+    }
     function chkCheck() {
       const { it } = curChk();
-      if (!chkFinalMeaning(it)) { chkErr = "고칠 뜻을 고르세요."; keepScrollRender(); return; }
-      if (!String(it.why || "").trim()) { chkErr = "까닭을 한 문장으로 써 주세요."; keepScrollRender(); return; }
+      if (!it.examples || !it.examples.length) { chkErr = "먼저 어구 하나를 넣어 컴퓨터를 가르쳐 주세요."; keepScrollRender(); return; }
       it.checked = true; chkErr = ""; saveState(); keepScrollRender();
     }
     function chkGo(k) { chkOf(state.currentTarget).cur = k; chkErr = ""; saveState(); keepScrollRender(); }
@@ -2150,9 +2200,9 @@
             <h2>👥 컴퓨터가 뜻을 나누기까지, 사람이 정한 것은?</h2>
             <p>사람이 정한 것이라고 생각하면 눌러 표시해요.</p></div></div>
           <div class="human-list">${HUMAN_DECISIONS.map((h, i) => `<span class="human-item ${state.human[i] ? "on" : ""}" onclick="toggleHuman(${i})">${state.human[i] ? "✅" : "⬜"} ${h}</span>`).join("")}</div>
-          <div class="class-summary">컴퓨터는 처음에 같은 낱말을 한 뜻으로 보았다가, 0과 1 모양이 닮은 줄끼리 모아 뜻을 나누었어요.<br>
-            사람은 옆 말과 낱말의 뜻, 내 경험을 함께 생각해서 뜻을 가려내요. 나는 낱말의 뜻과 경험까지 함께 읽어요. 이것이 <b>문맥 추론</b>이에요.<br>
-            컴퓨터는 같은 말을 찾아 셀 뿐, 뜻을 알지는 못해요. 그리고 뜻 이름표를 붙인 것은 <b>사람</b>이에요.</div>
+          <div class="class-summary">컴퓨터는 뜻 이름표가 붙은 어구에서 목표 낱말 주변의 말을 세고, 새 어구의 옆 말과 비교해 뜻을 짐작해요. 여러 뜻과 함께 나온 옆 말은 그 비율만큼 나누어 계산해요.<br>
+            사람은 컴퓨터가 배울 어구와 뜻 이름표를 고르고, 옆 말과 낱말의 뜻, 내 경험을 함께 생각해요. 이것이 <b>문맥 추론</b>이에요.<br>
+            컴퓨터는 사람이 준 자료와 규칙에 따라 계산할 뿐, 낱말의 뜻을 스스로 이해하지는 못해요.</div>
         </section>
         ${wrapHTML()}`;
     }
@@ -2247,12 +2297,14 @@
         });
         LEXICON[t].checks.forEach((x, i) => {
           const it = ck[i]; if (!it || !it.first) return;
-          const j = it.revealed ? judgeNew(t, x.text) : null;
-          const comp = !j ? "" : j.kind === "pick" ? `컴퓨터: 덩어리 ${GROUP_NAMES[j.group]} (${name(t, groupTrueMeaning(t, j.group))}) 짐작` : j.kind === "tie" ? "컴퓨터: 헷갈려요" : "컴퓨터: 모르겠어요";
-          const fm = chkFinalMeaning(it);
-          rows.push({ no: state.studentNo, word: t, kind: `새 어구 점검 ${i + 1} (정답 ${name(t, x.m)})`, sentence: x.text, first: name(t, it.first),
+          const examples = Array.isArray(it.examples) ? it.examples : [];
+          const base = judgeNew(t, x.text), j = it.revealed ? judgeNew(t, x.text, examples) : null;
+          const comp = !j ? "" : `컴퓨터: 학습 전 ${predictionLabel(t, base)} → 학습 후 ${predictionLabel(t, j)}`;
+          const correct = j && j.kind === "pick" && j.meaning === x.m;
+          rows.push({ no: state.studentNo, word: t, kind: `컴퓨터 가르치기 ${i + 1} (정답 ${name(t, x.m)})`, sentence: x.text, first: name(t, it.first),
             clues: [...new Set(contextOf(x.text, t).ctx)].join(", "), group: comp, groupName: "",
-            keep: it.keep === "keep" ? "유지" : it.keep === "change" ? "수정" : "", final: fm ? `${name(t, fm)} ${it.checked ? (fm === x.m ? "⭕" : "❌") : ""}` : "", why: it.why || "" });
+            keep: examples.length ? `가르친 어구 ${examples.length}개` : "", final: j ? `${predictionLabel(t, j)} ${it.checked ? (correct ? "⭕" : "❌") : ""}` : "",
+            why: examples.map(ex => `${ex.text} → ${name(t, ex.m)}`).join(" / ") });
         });
       });
       const s = S(), toks = storyTokens();
